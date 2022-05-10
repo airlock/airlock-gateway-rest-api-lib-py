@@ -23,4 +23,8 @@ multiple Errors will be raised by the underlying library.
 An example script is provided under [Airlock's example script repository](https://github.com/ergon/airlock-example-scripts)
 with the intent to demonstrate how to use some of the library functions.
 
+The current version of this library has been developed for hosts running 
+Airlock Gateway 7.7, some REST calls will not work for hosts running different
+versions of Airlock Gateway.
+
 A full documentation of this library is available at [Airlock's GitHub Page](https://ergon.github.io/airlock-gateway-rest-api-lib).

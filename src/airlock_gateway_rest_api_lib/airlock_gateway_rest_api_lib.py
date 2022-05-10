@@ -52,7 +52,7 @@ class GatewaySession:
 
     Uses the `requests` Python library to perform HTTP.
     '''
-    def __init__(self, host_name, ses, port=None):
+    def __init__(self, host_name: str, ses: Session, port: int = None):
         self.port = port if port else 443
         self.host = f"{host_name}:{port}" if port != 443 else host_name
         self.host_name = host_name
@@ -196,7 +196,7 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
     gw_session = GatewaySession(host, ses, port)
     gw_session.add_headers({"Authorization": f"Bearer {api_key}"})
     logging.info("Starting the REST Session with Host %s", host)
-    res = post(gw_session, "/session/create", [200, 404])
+    res = post(gw_session, "/session/create", exp_code=[200, 404])
     if res.status_code == 200:
         return GatewaySession(host, ses, port)
     return None
@@ -235,7 +235,7 @@ def terminate_session(gw_session: GatewaySession) -> None:
     '''
     Terminates the Gateway Session.
     '''
-    post(gw_session, "/session/terminate", 200)
+    post(gw_session, "/session/terminate", exp_code=200)
 
 
 def get_configs(gw_session: GatewaySession) -> list:
@@ -243,7 +243,7 @@ def get_configs(gw_session: GatewaySession) -> list:
     Returns a list containing all configurations on the
     Airlock Host as dictionary objects.
     '''
-    res = get(gw_session, "/configuration/configurations", 200)
+    res = get(gw_session, "/configuration/configurations", exp_code=200)
     return res.json()["data"]
 
 
@@ -253,7 +253,7 @@ def validate(gw_session: GatewaySession) -> Tuple[bool, list]:
     False and a list of error messages if it isn't.
     '''
     path = "/configuration/validator-messages?filter=meta.severity==ERROR"
-    res = get(gw_session, path, 200)
+    res = get(gw_session, path, exp_code=200)
     rdata = res.json()
     if len(rdata["data"]) > 0:
         msgs = [e["attributes"]["detail"] for e in rdata["data"]]
@@ -324,7 +324,7 @@ def get_virtualhosts(gw_session: GatewaySession) -> list:
     Returns a list of dictionary objects describing all
     virtual hosts on the Airlock Host.
     '''
-    res = get(gw_session, '/configuration/virtual-hosts', 200)
+    res = get(gw_session, '/configuration/virtual-hosts', exp_code=200)
     return res.json().get('data')
 
 
@@ -388,7 +388,7 @@ def get_virtual_host_by_id(gw_session: GatewaySession, vh_id: str) -> dict:
     the given `vh_id` or None if no such virtual host was found
     '''
     path = f'/configuration/virtual-hosts/{vh_id}'
-    res = get(gw_session, path, [200, 404])
+    res = get(gw_session, path, exp_code=[200, 404])
 
     if res.status_code == 404:
         return None
@@ -421,7 +421,7 @@ def delete_virtual_host_by_id(gw_session: GatewaySession, vh_id: str) -> bool:
     Returns True if deletion was successful and False otherwise.
     '''
     path = f"/configuration/virtual-hosts/{vh_id}"
-    res = delete(gw_session, path, [204, 404])
+    res = delete(gw_session, path, exp_code=[204, 404])
     return res.status_code == 204
 
 
@@ -450,7 +450,7 @@ def select_mappings(gw_session: GatewaySession, pattern: str = None,
                     )
     if label:
         path = f'/configuration/mappings?filter=label=={label}'
-        res = get(gw_session, path, 200)
+        res = get(gw_session, path, exp_code=200)
         return res.json().get('data')
     mappings = []
     for mapping in get_all_mappings(gw_session):
@@ -477,7 +477,7 @@ def get_mapping_by_id(gw_session: GatewaySession, mapping_id: str) -> dict:
     was found.
     '''
     path = f'/configuration/mappings/{mapping_id}'
-    res = get(gw_session, path, [200, 404])
+    res = get(gw_session, path, exp_code=[200, 404])
     if res.status_code == 200:
         return res.json().get('data')
     return None
@@ -490,7 +490,7 @@ def get_mapping_by_name(gw_session: GatewaySession, name: str) -> dict:
     such mapping was found.
     '''
     path = f'/configuration/mappings?filter=name=={name}'
-    res = get(gw_session, path, 200)
+    res = get(gw_session, path, exp_code=200)
     return res.json().get('data')
 
 
@@ -540,7 +540,7 @@ def export_mappings(gw_session: GatewaySession,
     for mapping_id in mapping_ids:
         gw_session.add_headers({"Accept": "application/zip"})
         path = f'/configuration/mappings/{mapping_id}/export'
-        res = get(gw_session, path, [200, 404])
+        res = get(gw_session, path, exp_code=[200, 404])
         if res.status_code == 200:
             with ZipFile(BytesIO(res.content)) as zip_file:
                 with zip_file.open("alec_table.xml", "r") as mapping_xml:
@@ -560,7 +560,7 @@ def delete_mapping_by_id(gw_session: GatewaySession, mapping_id: str) -> bool:
     `mapping_id` was found..
     '''
     path = f"/configuration/mappings/{mapping_id}"
-    res = delete(gw_session, path, [204, 404])
+    res = delete(gw_session, path, exp_code=[204, 404])
     return res.status_code == 204
 
 
@@ -657,7 +657,7 @@ def pull_from_source_mapping(gw_session: GatewaySession,
     `mapping_id` was found.
     '''
     path = f'/configuration/mappings/{mapping_id}/pull-from-source-mapping'
-    res = post(gw_session, path, [200, 404])
+    res = post(gw_session, path, exp_code=[200, 404])
     return res.status_code == 200
 
 
@@ -697,7 +697,7 @@ def get_backend_groups(gw_session: GatewaySession) -> list:
     '''
     Returns a list containing all backend groups on the Airlock Host.
     '''
-    res = get(gw_session, '/configuration/back-end-groups', 200)
+    res = get(gw_session, '/configuration/back-end-groups', exp_code=200)
     return res.json().get('data')
 
 
@@ -707,7 +707,7 @@ def get_backend_group_by_id(gw_session: GatewaySession, beg_id: str) -> dict:
     `beg_id`, or None if no such group was found.
     '''
     path = f'/configuration/back-end-groups/{beg_id}'
-    res = get(gw_session, path, [200, 404])
+    res = get(gw_session, path, exp_code=[200, 404])
     if res.status_code == 200:
         return res.json().get('data')
     return None
@@ -741,7 +741,7 @@ def delete_backend_group_by_id(gw_session: GatewaySession,
     Group with ID `beg_id` was found.
     '''
     path = f"/configuration/back-end-groups/{beg_id}"
-    res = delete(gw_session, path, [204, 404])
+    res = delete(gw_session, path, exp_code=[204, 404])
     return res.status_code == 204
 
 
@@ -772,13 +772,13 @@ def connect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
     the provided IDs was not found.
     '''
     data = {
-        "data": [{
+        "data": {
             "type": 'back-end-group',
             "id": beg_id
-        }]
+        }
     }
     map_id = mapping_id
-    path = f'/configuration/mappings/{map_id}/relationships/back-end-groups'
+    path = f'/configuration/mappings/{map_id}/relationships/back-end-group'
     res = patch(gw_session, path, data, [204, 404])
     return res.status_code == 204
 
@@ -852,7 +852,7 @@ def load_initial_config(gw_session: GatewaySession):
     '''
     Loads the initial configuration on the Airlock Host.
     '''
-    res = get(gw_session, '/configuration/configurations', 200)
+    res = get(gw_session, '/configuration/configurations', exp_code=200)
     data = res.json()['data']
     init_cfg_id = [x['id'] for x in data
                    if x['attributes']['configType'] == 'INITIAL'][0]
@@ -892,7 +892,8 @@ def _export_current_config_data(gw_session: GatewaySession):
     Returns a zip file that describes the currently active configuration
     on Airlock Host.
     '''
-    res = get(gw_session, '/configuration/configurations/export', 200)
+    path = '/configuration/configurations/export'
+    res = get(gw_session, path, exp_code=200)
     return res.content
 
 
