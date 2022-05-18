@@ -34,7 +34,7 @@ import urllib3
 from requests import Session, Response
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-LIBRARY_COMPATIBILITY_VERSION = '7.7'
+LIBRARY_COMPATIBILITY_VERSION = '7.8'
 
 
 class AirlockGatewayRestError(Exception):
@@ -801,21 +801,24 @@ def connect_virtual_host_to_map(gw_session: GatewaySession, vh_id: str,
 
 
 def connect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
-                       beg_id: str) -> bool:
+                       beg_ids: list) -> bool:
     '''
-    Connects Mapping with ID `mapping_id` to the Backend Group
-    with ID `beg_id`.\n
+    Connects Mapping with ID `mapping_id` to the Backend Groups
+    with IDs in `beg_ids`.\n
     Returns True if the operation was successful and False if one of
     the provided IDs was not found.
     '''
     data = {
-        "data": {
+        "data": []
+    }
+    for beg_id in beg_ids:
+        group = {
             "type": 'back-end-group',
             "id": beg_id
         }
-    }
+        data['data'].append(group)
     map_id = mapping_id
-    path = f'/configuration/mappings/{map_id}/relationships/back-end-group'
+    path = f'/configuration/mappings/{map_id}/relationships/back-end-groups'
     res = patch(gw_session, path, data, [204, 404])
     return res.status_code == 204
 
@@ -839,19 +842,22 @@ def disconnect_virtual_host_to_map(gw_session: GatewaySession, vh_id: str,
 
 
 def disconnect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
-                          beg_id: str) -> bool:
+                          beg_ids: list) -> bool:
     '''
-    Disconnects Mapping with ID `mapping_id` to the Backend Group
-    with ID `beg_id`.\n Returns True if the operation was successful
+    Disconnects Mapping with ID `mapping_id` from the Backend Groups
+    with IDs in `beg_id`.\n Returns True if the operation was successful
     and False if one of the provided IDs was not found.
     '''
     data = {
-        "data": {
+        "data": []
+    }
+    for beg_id in beg_ids:
+        group = {
             "type": 'back-end-group',
             "id": beg_id
         }
-    }
-    path = f'/configuration/mappings/{mapping_id}/relationships/back-end-group'
+        data['data'].append(group)
+    path = f'/configuration/mappings/{mapping_id}/relationships/back-end-groups'
     res = delete(gw_session, path, data, [204, 404])
     return res.status_code == 204
 
