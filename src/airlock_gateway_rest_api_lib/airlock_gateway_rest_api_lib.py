@@ -34,6 +34,7 @@ import urllib3
 from requests import Session, Response
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+LIBRARY_COMPATIBILITY_VERSION = '7.7'
 
 
 class AirlockGatewayRestError(Exception):
@@ -75,6 +76,31 @@ class GatewaySession:
         Returns the internal Session object of this object.
         '''
         return self.ses
+
+
+# pylint: disable = W1401
+def get_version(gw_session: GatewaySession) -> str:
+    '''
+    Returns the major and minor realease number (for example 7.8) of the
+    Airlock Host, or None if the version could not be retrieved.\n
+    As there is no REST call to gather this information, this is done
+    by performing a GET Request at the GUI webpage and manually looking
+    for the version number in the HTML response.
+    '''
+    host = gw_session.host
+    uri = f'https://{host}/airlock/configuration/systemAdmin.jsf'
+    res = gw_session.ses.get(uri)
+    _res_expect_handle(res, 200)
+    body = res.content.decode('utf-8')
+    body_stripped = (body.replace('\n', '')).replace('\t', '')
+    start_idx = body_stripped.find('<span>Version:') + 14
+    end_idx = body_stripped.find('</span>', start_idx)
+    span_with_version_number = body_stripped[start_idx:end_idx]
+    pattern = '^<span.*>(\d\.\d)'
+    match = re.search(pattern, span_with_version_number)
+    if match:
+        return match.group(1)
+    return None
 
 
 def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
@@ -198,7 +224,17 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
     logging.info("Starting the REST Session with Host %s", host)
     res = post(gw_session, "/session/create", exp_code=[200, 404])
     if res.status_code == 200:
-        return GatewaySession(host, ses, port)
+        version = get_version(gw_session)
+        if version:
+            if version != LIBRARY_COMPATIBILITY_VERSION:
+                logging.warning("You are using Airlock version %s while this \
+library version is developed for Airlock hosts running version %s. Some Rest \
+calls will not work on this Airlock version", version, \
+LIBRARY_COMPATIBILITY_VERSION)
+        else:
+            logging.warning('The Airlock version could not be determined, \
+this library version might be incompatible with this Airlock Host')
+        return gw_session
     return None
 
 
@@ -278,7 +314,8 @@ def activate(gw_session: GatewaySession, comment: str = None) -> bool:
     if not validate(gw_session)[0]:
         logging.info("Configuration could not be activated as it isn't valid")
         return False
-    post(gw_session, "/configuration/configurations/activate", data, 200)
+    path = "/configuration/configurations/activate"
+    post(gw_session, path, data, 200)
     return True
 
 
