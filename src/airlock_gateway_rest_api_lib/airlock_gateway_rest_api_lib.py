@@ -229,8 +229,8 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
             if version != LIBRARY_COMPATIBILITY_VERSION:
                 logging.warning("You are using Airlock version %s while this \
 library version is developed for Airlock hosts running version %s. Some Rest \
-calls will not work on this Airlock version", version, \
-LIBRARY_COMPATIBILITY_VERSION)
+calls will not work on this Airlock version", version,
+                                LIBRARY_COMPATIBILITY_VERSION)
         else:
             logging.warning('The Airlock version could not be determined, \
 this library version might be incompatible with this Airlock Host')
@@ -845,7 +845,7 @@ def disconnect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
                           beg_ids: list) -> bool:
     '''
     Disconnects Mapping with ID `mapping_id` from the Backend Groups
-    with IDs in `beg_id`.\n Returns True if the operation was successful
+    with IDs in `beg_ids`.\n Returns True if the operation was successful
     and False if one of the provided IDs was not found.
     '''
     data = {
@@ -857,7 +857,8 @@ def disconnect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
             "id": beg_id
         }
         data['data'].append(group)
-    path = f'/configuration/mappings/{mapping_id}/relationships/back-end-groups'
+    map_id = mapping_id
+    path = f'/configuration/mappings/{map_id}/relationships/back-end-groups'
     res = delete(gw_session, path, data, [204, 404])
     return res.status_code == 204
 
