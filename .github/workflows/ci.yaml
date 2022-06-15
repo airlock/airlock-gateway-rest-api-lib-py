@@ -1,0 +1,23 @@
+name: check
+
+on: 
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Docs
+    runs-on: ubuntu-18.04
+    steps:
+      - name: checkout git repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          pip install -U pip setuptools wheel pdoc
+          pip install -U .
+      
+      - name: Generate documentation
+        run: |
+          pdoc src/airlock_gateway_rest_api_lib/airlock_gateway_rest_api_lib.py -o docs
