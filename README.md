@@ -11,10 +11,9 @@ Airlock Gateway 7.7, some REST calls will not work for hosts running different
 versions of Airlock Gateway.
 
 A full documentation of this library is available at [Airlock's GitHub Page](https://ergon.github.io/airlock-gateway-rest-api-lib-py).
-The library is also available on PIP at https://test.pypi.org/project/airlock-gateway-rest-api-lib/
 
-An example script is provided under [Airlock's example script repository](https://github.com/ergon/airlock-example-scripts)
-with the intent to demonstrate how to use some of the library functions.
+An example script is provided under the `examples` folder with
+the intent to demonstrate how to use some of the library functions.
 
 This library uses the `requests` library to perform standard HTTP requests
 to Airlock Gateway REST endpoints.
