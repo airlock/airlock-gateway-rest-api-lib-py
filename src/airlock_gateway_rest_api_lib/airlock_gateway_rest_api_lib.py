@@ -557,7 +557,7 @@ def import_mappings_from_xml(gw_session, mappings_xmls: list):
 
         mapping_zip.seek(0)
 
-        req_raw(gw_session, "put", "configuration/mappings/import",
+        req_raw(gw_session, "put", "/configuration/mappings/import",
                 "application/zip", mapping_zip.read(), 200)
 
 
