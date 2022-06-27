@@ -818,7 +818,7 @@ multiple Errors will be raised by the underlying library.</p>
 </span><span id="L-557"><a href="#L-557"><span class="linenos">557</span></a>
 </span><span id="L-558"><a href="#L-558"><span class="linenos">558</span></a>        <span class="n">mapping_zip</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="L-559"><a href="#L-559"><span class="linenos">559</span></a>
-</span><span id="L-560"><a href="#L-560"><span class="linenos">560</span></a>        <span class="n">req_raw</span><span class="p">(</span><span class="n">gw_session</span><span class="p">,</span> <span class="s2">&quot;put&quot;</span><span class="p">,</span> <span class="s2">&quot;configuration/mappings/import&quot;</span><span class="p">,</span>
+</span><span id="L-560"><a href="#L-560"><span class="linenos">560</span></a>        <span class="n">req_raw</span><span class="p">(</span><span class="n">gw_session</span><span class="p">,</span> <span class="s2">&quot;put&quot;</span><span class="p">,</span> <span class="s2">&quot;/configuration/mappings/import&quot;</span><span class="p">,</span>
 </span><span id="L-561"><a href="#L-561"><span class="linenos">561</span></a>                <span class="s2">&quot;application/zip&quot;</span><span class="p">,</span> <span class="n">mapping_zip</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="mi">200</span><span class="p">)</span>
 </span><span id="L-562"><a href="#L-562"><span class="linenos">562</span></a>
 </span><span id="L-563"><a href="#L-563"><span class="linenos">563</span></a>
@@ -2475,7 +2475,7 @@ such mapping was found.</p>
 </span><span id="import_mappings_from_xml-558"><a href="#import_mappings_from_xml-558"><span class="linenos">558</span></a>
 </span><span id="import_mappings_from_xml-559"><a href="#import_mappings_from_xml-559"><span class="linenos">559</span></a>        <span class="n">mapping_zip</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="import_mappings_from_xml-560"><a href="#import_mappings_from_xml-560"><span class="linenos">560</span></a>
-</span><span id="import_mappings_from_xml-561"><a href="#import_mappings_from_xml-561"><span class="linenos">561</span></a>        <span class="n">req_raw</span><span class="p">(</span><span class="n">gw_session</span><span class="p">,</span> <span class="s2">&quot;put&quot;</span><span class="p">,</span> <span class="s2">&quot;configuration/mappings/import&quot;</span><span class="p">,</span>
+</span><span id="import_mappings_from_xml-561"><a href="#import_mappings_from_xml-561"><span class="linenos">561</span></a>        <span class="n">req_raw</span><span class="p">(</span><span class="n">gw_session</span><span class="p">,</span> <span class="s2">&quot;put&quot;</span><span class="p">,</span> <span class="s2">&quot;/configuration/mappings/import&quot;</span><span class="p">,</span>
 </span><span id="import_mappings_from_xml-562"><a href="#import_mappings_from_xml-562"><span class="linenos">562</span></a>                <span class="s2">&quot;application/zip&quot;</span><span class="p">,</span> <span class="n">mapping_zip</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="mi">200</span><span class="p">)</span>
 </span></pre></div>
 
