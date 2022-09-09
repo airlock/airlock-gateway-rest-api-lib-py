@@ -7,7 +7,7 @@ Ergon/Airlock does not provide support for it. Best effort support may
 be provided by the contributor of the library.
 
 The current version of this library has been developed for hosts running 
-Airlock Gateway 7.8, some REST calls will not work for hosts running different
+Airlock Gateway 8.0, some REST calls will not work for hosts running different
 versions of Airlock Gateway.
 
 A full documentation of this library is available at [Airlock's GitHub Page](https://ergon.github.io/airlock-gateway-rest-api-lib-py).

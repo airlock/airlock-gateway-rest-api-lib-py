@@ -34,7 +34,7 @@ import urllib3
 from requests import Session, Response
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-LIBRARY_COMPATIBILITY_VERSION = '7.8'
+LIBRARY_COMPATIBILITY_VERSION = '8.0'
 
 
 class AirlockGatewayRestError(Exception):
@@ -78,29 +78,29 @@ class GatewaySession:
         return self.ses
 
 
-# pylint: disable = W1401
-def get_version(gw_session: GatewaySession) -> str:
+def get_version(gw_session: GatewaySession) -> str | None:
     '''
-    Returns the major and minor realease number (for example 7.8) of the
+    Returns the major and minor realease number (for example 8.0) of the
     Airlock Host, or None if the version could not be retrieved.\n
-    As there is no REST call to gather this information, this is done
-    by performing a GET Request at the GUI webpage and manually looking
-    for the version number in the HTML response.
     '''
-    host = gw_session.host
-    uri = f'https://{host}/airlock/configuration/systemAdmin.jsf'
-    res = gw_session.ses.get(uri)
-    _res_expect_handle(res, 200)
-    body = res.content.decode('utf-8')
-    body_stripped = (body.replace('\n', '')).replace('\t', '')
-    start_idx = body_stripped.find('<span>Version:') + 14
-    end_idx = body_stripped.find('</span>', start_idx)
-    span_with_version_number = body_stripped[start_idx:end_idx]
-    pattern = '^<span.*>(\d\.\d)'
-    match = re.search(pattern, span_with_version_number)
-    if match:
-        return match.group(1)
-    return None
+    res = get(gw_session, "/system/status/node", exp_code=200)
+    if "version" in res.json()["data"]["attributes"]:
+        return res.json()["data"]["attributes"]["version"]
+    else:  # Manual fallback method for older hosts
+        host = gw_session.host
+        uri = f'https://{host}/airlock/configuration/systemAdmin.jsf'
+        res = gw_session.ses.get(uri)
+        _res_expect_handle(res, 200)
+        body = res.content.decode('utf-8')
+        body_stripped = (body.replace('\n', '')).replace('\t', '')
+        start_idx = body_stripped.find('<span>Version:') + 14
+        end_idx = body_stripped.find('</span>', start_idx)
+        span_with_version_number = body_stripped[start_idx:end_idx]
+        pattern = r'^<span.*>(\d\.\d)'
+        match = re.search(pattern, span_with_version_number)
+        if match:
+            return match.group(1)
+        return None
 
 
 def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
@@ -226,7 +226,7 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
     if res.status_code == 200:
         version = get_version(gw_session)
         if version:
-            if version != LIBRARY_COMPATIBILITY_VERSION:
+            if not version.startswith(LIBRARY_COMPATIBILITY_VERSION):
                 logging.warning("You are using Airlock version %s while this \
 library version is developed for Airlock hosts running version %s. Some Rest \
 calls will not work on this Airlock version", version,
