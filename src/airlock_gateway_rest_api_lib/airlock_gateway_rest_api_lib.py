@@ -84,24 +84,7 @@ def get_version(gw_session: GatewaySession) -> str | None:
     Airlock Host, or None if the version could not be retrieved.\n
     '''
     res = get(gw_session, "/system/status/node", exp_code=200)
-    if "version" in res.json()["data"]["attributes"]:
-        return res.json()["data"]["attributes"]["version"]
-    else:  # Manual fallback method for older hosts
-        host = gw_session.host
-        uri = f'https://{host}/airlock/configuration/systemAdmin.jsf'
-        res = gw_session.ses.get(uri)
-        _res_expect_handle(res, 200)
-        body = res.content.decode('utf-8')
-        body_stripped = (body.replace('\n', '')).replace('\t', '')
-        start_idx = body_stripped.find('<span>Version:') + 14
-        end_idx = body_stripped.find('</span>', start_idx)
-        span_with_version_number = body_stripped[start_idx:end_idx]
-        pattern = r'^<span.*>(\d\.\d)'
-        match = re.search(pattern, span_with_version_number)
-        if match:
-            return match.group(1)
-        return None
-
+    return res.json()["data"]["attributes"].get("version")
 
 def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
     '''
