@@ -78,7 +78,7 @@ class GatewaySession:
         return self.ses
 
 
-def get_version(gw_session: GatewaySession) -> str | None:
+def get_version(gw_session: GatewaySession) -> Union[str, None]:
     '''
     Returns the major and minor realease number (for example 8.0) of the
     Airlock Host, or None if the version could not be retrieved.\n
@@ -1058,7 +1058,7 @@ def set_error_page_settings(gw_session: GatewaySession, attributes: dict):
     patch(gw_session, path, data, exp_code=200)
 
 
-def get_error_pages(gw_session: GatewaySession) -> bytes | None:
+def get_error_pages(gw_session: GatewaySession) -> Union[bytes, None]:
     '''
     Returns a zip file containing the error pages
     '''
