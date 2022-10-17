@@ -846,6 +846,107 @@ def disconnect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
     return res.status_code == 204
 
 
+def get_mapping_deny_rule_group(gw_session: GatewaySession, mapping_id: str,
+                                denyrule_group_shortname: str) -> dict:
+    '''
+    Returns a dictionary object describing the deny rule group in the
+    specified Mapping, or None if the mapping or shortname specified were not
+    found.
+    '''
+    path = f'/configuration/mappings/{mapping_id}/deny-rule-groups/{denyrule_group_shortname}'
+    res = get(gw_session, path, exp_code=[200, 404])
+    return res.json().get('data')
+
+
+def update_mapping_deny_rule_group(gw_session: GatewaySession, mapping_id: str,
+                                   denyrule_group_shortname: str,
+                                   attributes: dict) -> bool:
+    '''
+    Updates the settings for a deny rule group within a specified mapping.
+    Returns True if successful, and False if if the mapping or shortname
+    specified were not found.
+    '''
+    path = f'/configuration/mappings/{mapping_id}/deny-rule-groups/{denyrule_group_shortname}'
+    data = {
+        "data": {
+            "type": "mapping-deny-rule-group",
+            "attributes": attributes
+        }
+    }
+    res = patch(gw_session, path, data, exp_code=[200, 404])
+    return res.status_code == 200
+
+
+def get_mapping_deny_rule(gw_session: GatewaySession, mapping_id: str,
+                          denyrule_shortname: str) -> dict:
+    '''
+    Returns a dictionary object describing the deny rule in the specified
+    Mapping, or None if the mapping or shortname specified were not found.
+    '''
+    path = f'/configuration/mappings/{mapping_id}/deny-rules/{denyrule_shortname}'
+    res = get(gw_session, path, exp_code=[200, 404])
+    return res.json().get("data")
+
+
+def update_mapping_deny_rule(gw_session: GatewaySession, mapping_id: str,
+                             denyrule_shortname: str, attributes: dict) -> bool:
+    '''
+    Updates the settings for a deny rule within a specified mapping. Returns
+    True if successful, and False if if the mapping or shortname specified
+    were not found.
+    '''
+    path = f'/configuration/mappings/{mapping_id}/deny-rules/{denyrule_shortname}'
+    data = {
+        "data": {
+            "type": "mapping-deny-rule",
+            "attributes": attributes
+        }
+    }
+    res = patch(gw_session, path, data, exp_code=[200, 404])
+    return res.status_code == 200
+
+
+def get_deny_rule_groups(gw_session: GatewaySession) -> dict:
+    '''
+    Returns a list of all deny rule groups on the Airlock Host.
+    '''
+
+    path = '/configuration/deny-rule-groups'
+    res = get(gw_session, path, exp_code=200)
+    return res.json().get("data")
+
+
+def get_deny_rule_group(gw_session: GatewaySession, short_name: str) -> dict:
+    '''
+    Returns a dictionary object describing the specified deny rule group,
+    or None if it does not exist.
+    '''
+
+    path = f'/configuration/deny-rule-groups/{short_name}'
+    res = get(gw_session, path, exp_code=[200, 404])
+    return res.json().get("data")
+
+
+def get_deny_rules(gw_session: GatewaySession) -> list:
+    '''
+    Returns a list of all deny-rules on the Airlock Host.
+    '''
+
+    path = '/configuration/deny-rules'
+    res = get(gw_session, path, exp_code=200)
+    return res.json().get("data")
+
+
+def get_deny_rule(gw_session: GatewaySession, short_name: str) -> dict:
+    '''
+    Returns a dictionary object describing the specified deny-rule, or None
+    if it does not exist.
+    '''
+    path = f'/configuration/deny-rules/{short_name}'
+    res = get(gw_session, path, exp_code=[200, 404])
+    return res.json().get("data")
+
+
 def load_config(gw_session: GatewaySession, config_id: int,
                 host_name: str = None) -> bool:
     '''
@@ -905,7 +1006,7 @@ def _get_hostname_from_config_zip(cfg_zip: str):
 def import_config(gw_session: GatewaySession, cfg_zip: str):
     '''
     Imports the configuration zip file located at
-    `cfg_zip` on the Airlock Host.
+    `cfg_zip` to the Airlock Host.
     '''
     with open(cfg_zip, 'rb') as file:
         cfg_host_name = _get_hostname_from_config_zip(cfg_zip)
@@ -932,3 +1033,86 @@ def export_current_config_file(gw_session: GatewaySession, cfg_zip: str):
     data = _export_current_config_data(gw_session)
     with open(cfg_zip, 'wb') as file:
         file.write(data)
+
+
+def get_error_page_settings(gw_session: GatewaySession) -> dict:
+    '''
+    Returns a dictionary object describing the current error page settings.
+    '''
+    path = '/configuration/error-pages'
+    res = get(gw_session, path, exp_code=200)
+    return res.json().get('data')
+
+
+def set_error_page_settings(gw_session: GatewaySession, attributes: dict):
+    '''
+    Updates the error page settings with the given attributes.
+    '''
+    path = '/configuration/error-pages'
+    data = {
+        "data": {
+            "type": "error-pages",
+            "attributes": attributes
+        }
+    }
+    patch(gw_session, path, data, exp_code=200)
+
+
+def get_error_pages(gw_session: GatewaySession) -> bytes | None:
+    '''
+    Returns a zip file containing the error pages
+    '''
+    path = '/configuration/error-pages/content'
+    res = get(gw_session, path, exp_code=[200, 404])
+    if res.status_code == 404:
+        return None
+    return res.content
+
+
+def set_error_pages(gw_session: GatewaySession, error_page_zip: str):
+    '''
+    Imports the error page zip-file located at `error_page_zip`.
+    '''
+    with open(error_page_zip, 'rb') as file:
+        path = "/configuration/error-pages/content"
+        req_raw(gw_session, "PUT", path, "application/zip", file, 200)
+
+
+def delete_error_pages(gw_session: GatewaySession):
+    '''
+    Remove the custom error pages.
+    '''
+    path = '/configuration/error-pages/content'
+    delete(gw_session, path, exp_code=200)
+
+
+def get_default_error_pages(gw_session: GatewaySession) -> bytes:
+    '''
+    Returns a zip file containing the default error pages.
+    '''
+    path = '/configuration/error-pages/content/default'
+    res = get(gw_session, path, exp_code=200)
+    return res.content
+
+
+def get_expert_settings(gw_session: GatewaySession) -> dict:
+    '''
+    Returns a dict containing the global expert settings for the Gateway as well as for Apache
+    '''
+    path = '/configuration/expert-settings'
+    res = get(gw_session, path, exp_code=200)
+    return res.json().get('data')
+
+
+def set_expert_settings(gw_session: GatewaySession, attributes: dict) -> None:
+    '''
+    Updates the global expert settings with the given attributes.
+    '''
+    path = '/configuration/expert-settings'
+    data = {
+        "data": {
+            "type": 'expert-settings',
+            "attributes": attributes
+        }
+    }
+    patch(gw_session, path, data, exp_code=200)
