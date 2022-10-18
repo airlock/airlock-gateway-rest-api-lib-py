@@ -21,6 +21,7 @@ handled by this library, so for example if network problems occur,
 multiple Errors will be raised by the underlying library.
 """
 
+
 import xml.etree.ElementTree as ET
 from io import BytesIO
 from typing import Tuple, Union
@@ -33,6 +34,7 @@ import requests
 import urllib3
 from requests import Session, Response
 
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 LIBRARY_COMPATIBILITY_VERSION = '8.0'
 
@@ -42,6 +44,7 @@ class AirlockGatewayRestError(Exception):
     Custom Exception to inform Library users that an unexpected status
     has been returbned by the performed REST call.
     '''
+
     def __init__(self, status_code, message):
         self.status_code = status_code
         self.message = "Status code " + str(status_code) + ": " + message
@@ -53,6 +56,7 @@ class GatewaySession:
 
     Uses the `requests` Python library to perform HTTP.
     '''
+
     def __init__(self, host_name: str, ses: Session, port: int = None):
         self.port = port if port else 443
         self.host = f"{host_name}:{port}" if port != 443 else host_name
@@ -86,6 +90,7 @@ def get_version(gw_session: GatewaySession) -> Union[str, None]:
     res = get(gw_session, "/system/status/node", exp_code=200)
     return res.json()["data"]["attributes"].get("version")
 
+
 def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
     '''
     Raises a custom exception if the responses' status code
@@ -97,7 +102,7 @@ def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
         if res.status_code not in exp_code:
             msg = f"Unexpected status code {res.status_code} was returned"
             logging.error(msg)
-            raise AirlockGatewayRestError(res.status_code,  res.text)
+            raise AirlockGatewayRestError(res.status_code, res.text)
 
 
 # pylint: disable = R0913
@@ -383,7 +388,7 @@ def gen_standard_virtual_host_data(vh_name: str, ipv4_addr: str,
                         "http2Allowed": True
                     }
                 },
-                "tls":  certificate,
+                "tls": certificate,
             }
         }
     }
