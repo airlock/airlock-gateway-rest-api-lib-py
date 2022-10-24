@@ -10,7 +10,7 @@ The current version of this library has been developed for hosts running
 Airlock Gateway 8.0, some REST calls will not work for hosts running different
 versions of Airlock Gateway.
 
-A full documentation of this library is available at [Airlock's GitHub Page](https://ergon.github.io/airlock-gateway-rest-api-lib-py).
+A full documentation of this library is available at [Airlock's GitHub Page](https://airlock.github.io/airlock-gateway-rest-api-lib-py).
 
 An example script is provided under the `examples` folder with
 the intent to demonstrate how to use some of the library functions.
