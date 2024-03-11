@@ -569,7 +569,7 @@ def export_mappings(gw_session: GatewaySession,
         if res.status_code == 200:
             with ZipFile(BytesIO(res.content)) as zip_file:
                 with zip_file.open("alec_table.xml", "r") as mapping_xml:
-                    mapping_xmls.append(mapping_xml)
+                    mapping_xmls.append(mapping_xml.read())
         else:
             logging.info("Mapping with ID %s was not found on Airlock Host",
                          mapping_id)
