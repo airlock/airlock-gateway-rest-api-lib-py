@@ -36,7 +36,7 @@ from requests import Session, Response
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-LIBRARY_COMPATIBILITY_VERSION = '8.1'
+LIBRARY_COMPATIBILITY_VERSION = '8.2'
 
 
 class AirlockGatewayRestError(Exception):
