@@ -516,7 +516,12 @@ def get_mapping_by_name(gw_session: GatewaySession, name: str) -> dict:
     '''
     path = f'/configuration/mappings?filter=name=={name}'
     res = get(gw_session, path, exp_code=200)
-    return res.json().get('data')
+
+    candidate_list = res.json().get('data')
+    if len(candidate_list) == 1:
+        return candidate_list[0]
+    else:
+        return {}
 
 
 def get_all_mapping_names(gw_session: GatewaySession) -> list:
