@@ -511,8 +511,7 @@ def get_mapping_by_id(gw_session: GatewaySession, mapping_id: str) -> dict:
 def get_mapping_by_name(gw_session: GatewaySession, name: str) -> dict:
     '''
     Returns a dictionary object representing the mapping
-    with the given `name` or an empty dictionary if no
-    such mapping was found.
+    with the given `name` or None if no such mapping was found.
     '''
     path = f'/configuration/mappings?filter=name=={name}'
     res = get(gw_session, path, exp_code=200)
@@ -520,8 +519,8 @@ def get_mapping_by_name(gw_session: GatewaySession, name: str) -> dict:
     candidate_list = res.json().get('data')
     if len(candidate_list) == 1:
         return candidate_list[0]
-    else:
-        return {}
+
+    return None
 
 
 def get_all_mapping_names(gw_session: GatewaySession) -> list:
@@ -1021,7 +1020,7 @@ def import_config(gw_session: GatewaySession, cfg_zip: str):
     with open(cfg_zip, 'rb') as file:
         cfg_host_name = _get_hostname_from_config_zip(cfg_zip)
         load_empty_config(gw_session, cfg_host_name)
-        path = "/configuration/configurations/import/"
+        path = "/configuration/configurations/import"
         req_raw(gw_session, "PUT", path, "application/zip", file, 200)
 
 
