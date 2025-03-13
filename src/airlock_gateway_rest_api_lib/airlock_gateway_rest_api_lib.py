@@ -226,7 +226,7 @@ this library version might be incompatible with this Airlock Host')
     return None
 
 
-def create_session_from_cookie(host: str, jsessionid: str) -> GatewaySession:
+def create_session_from_cookie(host: str, jsessionid: str, port: int = 443) -> GatewaySession:
     '''
     Retrieves an existing Gateway Session from the JSESSIONID Cookie.\n
     Returns the generated GatewaySession object.
@@ -235,7 +235,7 @@ def create_session_from_cookie(host: str, jsessionid: str) -> GatewaySession:
     ses.verify = False
     cookie = requests.cookies.create_cookie("JSESSIONID", jsessionid)
     ses.cookies.set_cookie(cookie)
-    return GatewaySession(host, ses)
+    return GatewaySession(host, ses, port)
 
 
 def _get_cookies(gw_session: GatewaySession) -> dict:

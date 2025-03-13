@@ -16,7 +16,10 @@
 # objects that describe mappings, backends and virtual host from
 # the logs.
 
-from airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import os, sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+
 import signal
 import argparse
 import logging
