@@ -4,15 +4,10 @@
 This Python script interacts with Airlock Gateway's REST API for managing the configuration of deny rule groups.
 It enables the addition, deletion, and listing of exceptions for deny rule groups through command-line options.
 
+**Important:** This script manages exceptions exclusively for built-in deny rule groups.
+It does not support custom deny rule groups. Custom deny rule groups use a different REST endpoint and thus require separate handling.
+
 Tested with Airlock Gateway versions 8.3 and 8.4.
-
-**Requirements**
-
-The script uses a Python library for interacting with Airlock Gateway's REST API. This library is available at
-https://github.com/airlock/airlock-gateway-rest-api-lib-py/tree/main/src/airlock_gateway_rest_api_lib and should be
-placed in the directory airlock_gateway_rest_api_lib:
-
-git clone https://github.com/airlock/airlock-gateway-rest-api-lib-py.git airlock_gateway_rest_api_lib
 
 The script requires a REST API key for Airlock Gateway. This key can be stored in "./api_key.conf" file or it can
 directly be provided using the '-k' command-line option.
@@ -20,23 +15,15 @@ directly be provided using the '-k' command-line option.
 **Functionality and Commands**
 The script contains three main functionalities:
 
-1. add: Add exceptions to a deny rule group.
-2. delete: Delete exceptions from a deny rule group.
-3. list: List exceptions from a deny rule group.
+1. add: Add exceptions to a deny rule group on matching mappings.
+2. delete: Delete exceptions from a deny rule group on matching mappings.
+3. list: List exceptions from a deny rule group on matching mappings.
 
-Each function requires regexes for selecting the deny rule groups and mappings.
-The regex patterns can be specified using the '--group-regex' and '--mapping-regex' command-line options.
-
-The add and delete functions require an identifier for the exception (-i command-line option).
-
-Moreover, the add function requires a pattern for the exception ('--parameter-name' or '--header-name' command-line options):
-- `--parameter-name`: Specifies a Parameter Name exception.
-- `--header-name`:  Specifies a Header Name exception.
-
-**Other important options:**
-
+Command-line arguments: 
 - `-g` or `--gateway`: Specify the gateway address
 - `-p` or `--port`: Specify the HTTPS port for the gateway (default is 443)
+- `--group-regex`: Regex to select deny rule groups
+- `--mapping-regex`: Regex to select mappings
 - `--parameter-name`: Specify a Parameter Name Pattern.
 - `--header-name`:  Specify a Header Name Pattern.
 - `--mapping-regex`:  Select mappings by using a regular expression on the mapping name.
@@ -49,11 +36,11 @@ Moreover, the add function requires a pattern for the exception ('--parameter-na
 
 **Examples**
 Add an exception for the parameter "comment" to all parameter value deny-rule groups on all "MyBank"-mappings:
-    ./deny_rule_exceptions.py add -g gateway --mapping-regex '^MyBank.*' --group-regex '.*' --parameter-name '^comment$' -i 'paymentComment1' -c test --activate
+    ./deny_rule_exceptions.py add -g mywaf.example.com --mapping-regex '^MyBank.*' --group-regex '.*' --parameter-name '^comment$' -i 'paymentComment1' -c test --activate
 Delete the exception 'paymentComment1' from all "MyBank"-mappings in all deny rule groups, activate the configuration:
-    ./deny_rule_exceptions.py delete -g gateway --mapping-regex '^MyBank.*' --group-regex '.*'  -i 'paymentComment1' -c test --activate
+    ./deny_rule_exceptions.py delete -g mywaf.example.com --mapping-regex '^MyBank.*' --group-regex '.*'  -i 'paymentComment1' -c test --activate
 List exceptions from all "MyBank"-mappings:
-    ./deny_rule_exceptions.py list -g gateway --mapping-regex '^MyBank.*' --group-regex '.*'
+    ./deny_rule_exceptions.py list -g mywaf.example.com --mapping-regex '^MyBank.*' --group-regex '.*'
 """
 
 import argparse
