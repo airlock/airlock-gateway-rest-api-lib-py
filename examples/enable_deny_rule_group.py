@@ -5,10 +5,13 @@ Script to enable or disable a deny rule group on all mappings.
 Tested with Airlock Gateway versions 8.3 and 8.4.
 
 Usage example:
-  ./enable_deny_rule_group.py -g mywaf.example.com --group-regex SQLI_PARAM_VALUE -a enable -k <YOUR_API_KEY> -y -c "Update deny rule group"
-  
+  ./enable_deny_rule_group.py -g mywaf.example.com --group-regex SQLI_PARAM_VALUE -a enable -k <YOUR_API_KEY> -y -c "Update deny rule group" --activate
+
 If -k is not provided, the script will try to read the API key from "api_key.conf"
-with a [KEY] section and an "api_key" value.
+(with a [KEY] section and an "api_key" value).
+
+By default, changes are saved (but not activated). To activate the configuration,
+supply the --activate flag.
 """
 
 import sys
@@ -19,6 +22,7 @@ import logging
 import signal
 import json
 
+# Extend the sys.path to find the library if needed.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
 
@@ -73,6 +77,8 @@ def main():
                         help="Deny Rule Group shortname")
     parser.add_argument("-a", "--action", choices=['enable', 'disable'], default='enable',
                         help="Enable or disable the deny rule group")
+    parser.add_argument("--activate", action="store_true",
+                        help="Activate the configuration (default: save configuration only)")
     parser.add_argument("-p", "--port", type=int, default=443,
                         help="Gateway HTTPS port (default: 443)")
     parser.add_argument("-k", "--api-key", help="REST API key for Airlock Gateway")
@@ -87,7 +93,6 @@ def main():
 
     # Get API key: either from command-line or config file.
     api_key = get_api_key(args)
-
 
     # Create a new session.
     global SESSION
@@ -126,15 +131,20 @@ def main():
         else:
             print(f"Failed to update mapping '{mapping['attributes']['name']}', mapping ID: {mapping_id}")
 
-    # Prompt for confirmation if not assumeyes.
+    # If not in assumeyes mode, prompt for confirmation with different text based on the --activate flag.
     if not args.assumeyes:
-        ans = input("\nContinue to save and activate the new configuration? [y/n] ")
+        prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
+        ans = input(prompt_text)
         if ans.lower() != "y":
             terminate_with_error("Operation cancelled.")
 
-    # Activate configuration; if activation fails, save config.
-    if al.activate(SESSION, comment):
-        print("Configuration activated successfully.")
+    # If --activate flag is provided, attempt to activate; otherwise, simply save.
+    if args.activate:
+        if al.activate(SESSION, comment):
+            print("Configuration activated successfully.")
+        else:
+            al.save_config(SESSION, comment)
+            print("Activation failed; configuration saved instead.")
     else:
         al.save_config(SESSION, comment)
         print("Configuration saved.")

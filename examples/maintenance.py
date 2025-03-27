@@ -8,13 +8,15 @@ Operations include:
     - Enabling/disabling maintenance on selected mappings:
          ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a enable
          ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a disable
-    - Deleting selected WAF mappings:
+    - Deleting selected mappings:
          ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a delete
 
-Tested with Airlock Gateway versions 8.3 and 8.4.
-
-If the API key is not provided with -k, it will be read from an api_key.conf file 
+By default, configuration changes are saved; add the --activate flag to activate them.
+If the API key is not provided with -k, it will be read from an "api_key.conf" file 
 (with a [KEY] section and an "api_key" value).
+
+Usage example:
+  ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a enable -k <YOUR_API_KEY> -f --activate -c "Update deny rule group"
 """
 
 import sys
@@ -38,6 +40,7 @@ logging.basicConfig(
 
 # Global session variable
 SESSION = None
+DEFAULT_API_KEY_FILE = "api_key.conf"
 
 def terminate_with_error(message=None):
     """Terminate the session and exit with an error message."""
@@ -55,7 +58,7 @@ def register_cleanup_handler():
                 signal.SIGTERM, signal.SIGQUIT):
         signal.signal(sig, cleanup)
 
-def get_api_key(args, key_file):
+def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     """Return the API key from command line or config file."""
     if args.api_key:
         return args.api_key.strip()
@@ -65,7 +68,7 @@ def get_api_key(args, key_file):
         try:
             return config.get("KEY", "api_key").strip()
         except Exception as e:
-            sys.exit(f"Error reading API key from {key_file}: {e}")
+            sys.exit("Error reading API key from api_key.conf: " + str(e))
     else:
         sys.exit("API key needed, either via -k option or in an api_key.conf file.")
 
@@ -88,30 +91,10 @@ def create_change_info(affected_mapping_names, action):
     info += " the following mapping(s):\n\t" + "\n\t".join(affected_mapping_names)
     return info
 
-def confirm(change_info, force_confirm):
-    """Ask for confirmation if not forced."""
-    if force_confirm is False:
-        return True
-    print(change_info)
-    answer = input("\nContinue to activate the new config? [y/n] ")
-    if answer.lower() == "y":
-        return True
-    print("Nothing changed")
-    return False
-
-def activate_config(SESSION, change_info):
-    """Activate the configuration with a comment."""
-    if not confirm(change_info, args.force):
-        terminate_with_error("Activation cancelled by user.")
-    comment = "REST: " + change_info.replace("\n\t", ", ").replace(": ,", ":")
-    if al.activate(SESSION, comment):
-        print("Configuration activated successfully.")
-    else:
-        print("Failed to activate configuration.")
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage maintenance page settings (or delete mappings) on Airlock WAF mappings."
+        description="Manage maintenance page settings (or delete mappings) on Airlock WAF mappings. "
+                    "By default configuration changes are saved; use --activate to activate them."
     )
     parser.add_argument("-g", "--gateway", required=True,
                         help="Airlock WAF hostname")
@@ -119,15 +102,23 @@ def main():
                         help="Regular expression to select mappings (e.g. '^mapping_a$')")
     parser.add_argument("-a", "--action", choices=["enable", "disable", "show", "delete"],
                         required=True, help="Action to perform on the selected mappings")
+    # The -f/--force flag: if provided, confirmation is skipped.
     parser.add_argument("-f", "--force", dest="force", action="store_false",
                         help="Force activation without confirmation")
+    parser.add_argument("--activate", action="store_true",
+                        help="Activate configuration (default is to save configuration)")
     parser.add_argument("-k", "--api-key", help="REST API key for Airlock Gateway")
     parser.add_argument("-p", "--port", type=int, default=443,
                         help="Gateway HTTPS port (default: 443)")
+    parser.add_argument("-c", "--comment", default="Script: {action} deny rule group for all mappings",
+                        help="Comment for the configuration change")
     global args
     args = parser.parse_args()
 
-    api_key = get_api_key(args, "./api_key.conf")
+    # Process the comment: replace placeholders if present.
+    comment = args.comment.format(action=args.action)
+
+    api_key = get_api_key(args, DEFAULT_API_KEY_FILE)
 
     global SESSION
     SESSION = al.create_session(args.gateway, api_key, args.port)
@@ -135,10 +126,9 @@ def main():
         sys.exit("Could not create session. Check gateway, port, and API key.")
 
     register_cleanup_handler()
-
     al.load_active_config(SESSION)
 
-    # Get selected mappings based on mapping selector regex
+    # Get selected mappings based on the provided regex.
     mappings = get_selected_mappings(SESSION, args.mapping_regex)
     if not mappings:
         terminate_with_error("No mappings found matching the selector pattern.")
@@ -163,7 +153,6 @@ def main():
                     "type": "mapping"
                 }
             }
-            
             res = al.patch(SESSION, f"/configuration/mappings/{mapping['id']}", data, exp_code=[200,404])
             if res.status_code == 200:
                 print(f"Updated mapping '{mapping['attributes']['name']}' successfully.")
@@ -177,10 +166,33 @@ def main():
             else:
                 print(f"Failed to delete mapping '{mapping['attributes']['name']}'.")
 
-    # Prepare change info and activate configuration.
+    # Build a change summary.
     affected_names = [mapping["attributes"]["name"] for mapping in mappings]
     change_info = create_change_info(affected_names, args.action)
-    activate_config(SESSION, change_info)
+    
+    # Prompt for confirmation (unless force flag is used).
+    if args.force:
+        # If force flag is False (i.e. not forced), then prompt.
+        prompt_text = "\nContinue to "
+        if args.activate:
+            prompt_text += "save and activate "
+        else:
+            prompt_text += "save "
+        prompt_text += "the new configuration? [y/n] "
+        ans = input(prompt_text)
+        if ans.lower() != "y":
+            terminate_with_error("Operation cancelled.")
+
+    # Save or activate the configuration based on --activate flag.
+    if args.activate:
+        if al.activate(SESSION, comment):
+            print("Configuration activated successfully.")
+        else:
+            al.save_config(SESSION, comment)
+            print("Activation failed; configuration saved instead.")
+    else:
+        al.save_config(SESSION, comment)
+        print("Configuration saved.")
 
     al.terminate_session(SESSION)
 

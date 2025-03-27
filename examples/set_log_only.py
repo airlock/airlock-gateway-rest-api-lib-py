@@ -10,16 +10,17 @@ This script directly interacts with the REST API endpoint:
     PATCH /configuration/mappings/{mappingId}/deny-rule-groups/{groupShortName}
 
 It updates the “logOnly” attribute for the specified deny rule groups on all mappings
-selected by a regex. Changes are saved (and optionally activated).
+selected by a regex. By default changes are saved; if the --activate flag is provided,
+the configuration will be activated after confirmation.
 
 API key is provided via the –k flag or read from an “api_key.conf” file (with a [KEY] section).
 
 Usage examples:
   Enable log‑only mode for deny rule groups (selected by group regex '.*') on all mappings matching “^cust”:
-      ./set_log_only.py add -g my_airlock --mapping-regex '^cust' --group-regex '.*' -k YOUR_API_KEY
+      ./set_log_only.py -g my_airlock --mapping-regex '^cust' --group-regex '.*' --activate -k YOUR_API_KEY
 
-  Disable log‑only mode (using –disable) for deny rule group 'SQL_PARAM_VALUE':
-      ./set_log_only.py add -g my_airlock --mapping-regex '^cust' --group-regex 'SQL_PARAM_VALUE' --disable -k YOUR_API_KEY
+  Disable log‑only mode (using --disable) for deny rule group 'SQL_PARAM_VALUE':
+      ./set_log_only.py -g my_airlock --mapping-regex '^cust' --group-regex 'SQL_PARAM_VALUE' --disable -k YOUR_API_KEY
 
   (Optionally add –y to skip confirmation and –c to provide a comment; –p to specify a port)
 """
@@ -106,7 +107,8 @@ def update_logonly_mode(mapping_regex, group_regex, log_only_value, assumeyes):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Update log‑only mode for deny rule groups on selected mappings."
+        description="Update log‑only mode for deny rule groups on selected mappings. "
+                    "By default changes are saved; use --activate to activate the new configuration."
     )
     parser.add_argument("-g", "--gateway", required=True,
                         help="Airlock Gateway hostname")
@@ -116,8 +118,10 @@ def main():
                         help="Regex to select deny-rule groups by name")
     parser.add_argument("--disable", action="store_true",
                         help="Disable log‑only mode (default is to enable)")
+    parser.add_argument("--activate", action="store_true",
+                        help="Activate configuration changes instead of just saving")
     parser.add_argument("-y", "--assumeyes", action="store_true",
-                        help="Automatically answer yes for all questions")
+                        help="Automatically confirm without prompting")
     parser.add_argument("-k", "--api-key", help="REST API key for Airlock Gateway")
     parser.add_argument("-p", "--port", type=int, default=443,
                         help="Gateway HTTPS port (default: 443)")
@@ -132,32 +136,41 @@ def main():
         sys.exit("Could not create session. Check gateway, port, and API key.")
     register_cleanup_handler()
 
-    # Load the active configuration.
+    # Load the active configuration
     al.load_active_config(SESSION)
 
-    # Determine desired logOnly mode.
+    # Determine desired logOnly mode
     log_only_value = False if args.disable else True
 
-    # Update log-only mode for each mapping and each deny rule group selected.
+    # Update log-only mode for each mapping and each deny rule group selected
     update_logonly_mode(args.mapping_regex, args.group_regex, log_only_value, args.assumeyes)
 
-    # Prepare change info.
-    # We list the names of all affected mappings.
+    # Prepare change summary
     affected_names = [m["attributes"]["name"] for m in al.select_mappings(SESSION, pattern=args.mapping_regex)]
     change_info = f"Log‑only mode {'disabled' if args.disable else 'enabled'} for deny rule groups on mappings: " + ", ".join(affected_names)
     print("\n" + change_info)
 
-    # Confirm change (unless assumeyes is given) and save configuration.
+    # Confirm change (unless assumeyes is given) and then save/activate config
     if not args.assumeyes:
-        ans = input("\nContinue to save the new configuration? [y/n] ")
+        prompt_text = "\nContinue to "
+        if args.activate:
+            prompt_text += "save and activate "
+        else:
+            prompt_text += "save "
+        prompt_text += "the new configuration? [y/n] "
+        ans = input(prompt_text)
         if ans.lower() != "y":
             terminate_with_error("Operation cancelled.")
-    if al.activate(SESSION, args.comment):
-        print("Configuration activated successfully.")
+    if args.activate:
+        if al.activate(SESSION, args.comment):
+            print("Configuration activated successfully.")
+        else:
+            al.save_config(SESSION, args.comment)
+            print("Activation failed; configuration saved instead.")
     else:
-        # If not activated, just save.
         al.save_config(SESSION, args.comment)
         print("Configuration saved.")
+
     al.terminate_session(SESSION)
 
 if __name__ == "__main__":

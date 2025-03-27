@@ -5,18 +5,17 @@ IP List Management on Airlock Gateway Versions 8.3.2 and later.
 
 This script supports three operations:
   1. list   : Lists all IP address lists (with IDs and IPs).
-  Usage:
-      ./ip_list_relationships.py list -g <HOSTNAME> [-p <PORT>] [-k <API_KEY>]
 
   2. update : Updates an IP list's relationships. Two update modes are supported:
-       --blacklist: Assign an IP list as a blacklist to one or more mappings by updating the IP list's blacklist relationship. 
+       --blacklist: Assign an IP list as a blacklist to one or more mappings by updating the IP list's blacklist relationship.
                     The specified mappings are appended to the existing blacklist set.
                     
        --whitelist: Assign an IP list as a whitelist for one or more mappings by modifying the mapping's 
-                    `ipRules.ipAddressWhitelists` attribute. If an entry for the specified path exists, 
+                    ipRules.ipAddressWhitelists attribute. If an entry for the specified path exists, 
                     the IP list is added to the existing set of whitelists. Otherwise, a new whitelist entry is created.
 
-After performing the updates, the script prompts (unless --assumeyes is given) and then activates the configuration.
+After performing the updates, the script prompts (unless --assumeyes is given) and then saves the configuration by default.
+If the --activate flag is provided, the script will attempt to activate the configuration instead of just saving it.
 
 API key is provided via the -k/--api-key flag or read from an "api_key.conf" file (with a [KEY] section).
 
@@ -29,6 +28,8 @@ Usage Examples:
 
   Update whitelist (requires --path-pattern):
       ./ip_list_relationships.py update -g mywaf.example.com -i 3 --whitelist --mapping-regex '^cust' --path-pattern 'testpath' -c "Add whitelist entries" -k YOUR_API_KEY
+
+By default, configuration changes are saved; add the --activate flag to activate them.
 """
 
 import sys
@@ -93,39 +94,33 @@ def update_blacklist(session, ip_list_id: str, mapping_regex: str, force: bool) 
     """
     Updates the IP blacklist for the given IP list by selecting mappings
     matching the provided regex.
-
-    Since the WAF treats the mapping IDs as a set (ignoring duplicates and
-    preserving existing entries not sent in the PATCH payload), we can simply send
-    the selected mapping IDs.
     """
     # Retrieve selected mappings by regex.
     selected_mappings = al.select_mappings(session, pattern=mapping_regex)
     if not selected_mappings:
         terminate_with_error("No mappings found matching the regex.")
 
-    # Build the payload with the mapping references.
+    # Build the payload with mapping references.
     mapping_refs = [{"type": "mapping", "id": mapping["id"]} for mapping in selected_mappings]
     mapping_info = [(mapping["id"], mapping["attributes"]["name"]) for mapping in selected_mappings]
 
     if not force:
-        print(f"About to update IP list {ip_list_id} blacklist relationship with these mappings:")
+        print(f"About to update IP list {ip_list_id} on endpoint 'mappings-blacklist' with these mappings:")
         for mapping_id, mapping_name in mapping_info:
             print(f"  ID: {mapping_id}, Name: {mapping_name}")
         ans = input("Continue with update? [y/n] ")
         if ans.lower() != "y":
             terminate_with_error("Operation cancelled.")
 
-    # PATCH the new blacklist mappings.
     endpoint = f"/configuration/ip-address-lists/{ip_list_id}/relationships/mappings-blacklist"
     payload = {"data": mapping_refs}
-    res = al.patch(session, endpoint, payload, exp_code=[204, 404])
+    res = al.patch(session, endpoint, payload, exp_code=[204,404])
     if res.status_code == 204:
         print("IP blacklist updated successfully.")
     else:
         print("Failed to update IP blacklist.")
 
     return {"updated_mappings": [name for _, name in mapping_info]}
-
 
 def update_whitelist(session, ip_list_id: str, mapping_regex: str, path_pattern: str, force: bool) -> dict:
     """
@@ -193,7 +188,8 @@ def update_whitelist(session, ip_list_id: str, mapping_regex: str, path_pattern:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage IP address lists on Airlock Gateway: list IP lists, update blacklists, or update whitelists."
+        description="Manage IP address list relationships on Airlock Gateway.\n"
+                    "By default, configuration changes are saved; use --activate to activate them."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -227,6 +223,8 @@ def main():
                                help="Automatically confirm without prompting")
     parser_update.add_argument("-c", "--comment", default="Update IP list relationships via REST API",
                                help="Comment for the configuration change")
+    parser_update.add_argument("--activate", action="store_true",
+                               help="Activate configuration (default: save configuration)")
     args = parser.parse_args()
 
     global SESSION
@@ -250,15 +248,21 @@ def main():
             print(json.dumps(result, indent=4))
 
         if not args.assumeyes:
-            ans = input("\nContinue to save and activate the new configuration? [y/n] ")
+            prompt_text = "\nContinue to " + ("save and activate " if args.activate else "save ") + "the new configuration? [y/n] "
+            ans = input(prompt_text)
             if ans.lower() != "y":
                 terminate_with_error("Operation cancelled.")
-        if al.activate(SESSION, args.comment):
-            print("Configuration activated successfully.")
+        if args.activate:
+            if al.activate(SESSION, args.comment):
+                print("Configuration activated successfully.")
+            else:
+                al.save_config(SESSION, args.comment)
+                print("Activation failed; configuration saved instead.")
         else:
-            # If not activated, just save.
             al.save_config(SESSION, args.comment)
             print("Configuration saved.")
+    else:
+        sys.exit("Unsupported command.")
 
     al.terminate_session(SESSION)
 

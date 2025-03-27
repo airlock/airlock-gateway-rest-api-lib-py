@@ -206,19 +206,21 @@ def main():
     else:
         print("Custom deny rule successfully associated with the group.")
 
-    # Confirm and then activate (if --activate is provided) or save the configuration.
     if not args.assumeyes:
-        ans = input("\nContinue to save and activate the new configuration? [y/n] ")
+        prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
+        ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.", SESSION)
+            terminate_with_error("Operation cancelled.")
+
+    # If --activate flag is provided, attempt to activate; otherwise, simply save.
     if args.activate:
-        if al.activate(SESSION, args.comment):
+        if al.activate(SESSION, comment):
             print("Configuration activated successfully.")
         else:
-            al.save_config(SESSION, args.comment)
-            print("Configuration saved.")
+            al.save_config(SESSION, comment)
+            print("Activation failed; configuration saved instead.")
     else:
-        al.save_config(SESSION, args.comment)
+        al.save_config(SESSION, comment)
         print("Configuration saved.")
 
     al.terminate_session(SESSION)

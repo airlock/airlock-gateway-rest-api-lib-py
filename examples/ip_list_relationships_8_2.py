@@ -3,10 +3,12 @@
 """
 IP List Management on Airlock Gateway Version 8.2
 Script to update an IP address list’s relationships (whitelist or blacklist)
-by appending mapping entries using the REST endpoint 'configuration/ip-address-lists/{ip_list_id}/relationships/(mappings-whitelist|mappings-blacklist)'
+by appending mapping entries using the REST endpoint:
+  /configuration/ip-address-lists/{ip_list_id}/relationships/(mappings-whitelist|mappings-blacklist)
 
 After performing the update, the script will prompt (unless --assumeyes is given)
-to confirm and then either activate or save the new configuration using al.activate and al.save_config.
+to confirm and then either save the new configuration (by default) or activate it if the
+--activate flag is provided.
 
 Usage Examples:
   List all IP address lists:
@@ -17,6 +19,9 @@ Usage Examples:
 
   Update the blacklist relationship (without forcing confirmation):
       ./update_ip_list_relationship_8.2.py update -g mywaf.example.com --ip-list-id 3 --blacklist --mapping-regex '^cust' -c "Add cust mappings to blacklist" -k YOUR_API_KEY
+
+By default, configuration changes are saved; add the --activate flag to activate them.
+API key is read from "api_key.conf" (with a [KEY] section) if not provided via -k.
 """
 
 import sys
@@ -89,30 +94,24 @@ def update_ip_list_relationship(session, ip_list_id: str, relationship_field: st
     if not mappings:
         terminate_with_error("No mappings found matching the regex.")
 
-    new_entries = []
-    mapping_refs = []
-    for mapping in mappings:
-        entry = {"type": "mapping", "id": mapping["id"]}
-        if entry not in mapping_refs:
-            mapping_refs.append(entry)
-            new_entries.append(entry)
+    mapping_refs = [{"type": "mapping", "id": mapping["id"]} for mapping in mappings]
 
-    if not new_entries:
+    if not mapping_refs:
         print("No new mapping entries to add.")
         return {}
 
     payload = {"data": mapping_refs}
 
     if not force:
-        print(f"About to update IP list {ip_list_id} on endpoint {relationship_field} with these mapping IDs:")
-        for entry in new_entries:
-            print(f"  {entry['id']}")
+        print(f"About to update IP list {ip_list_id} on endpoint {relationship_field} with the following mappings:")
+        for ref in mapping_refs:
+            mapping_name = next((m["attributes"]["name"] for m in mappings if m["id"] == ref["id"]), ref["id"])
+            print(f"  {ref['id']} ({mapping_name})")
         ans = input("Continue with update? [y/n] ")
         if ans.lower() != "y":
             terminate_with_error("Operation cancelled.")
 
     endpoint = f"/configuration/ip-address-lists/{ip_list_id}/relationships/{relationship_field}"
-    # Expect a 204 response.
     res = al.patch(session, endpoint, payload, exp_code=[204,404])
     if res.status_code == 204:
         print("IP list updated successfully.")
@@ -122,7 +121,8 @@ def update_ip_list_relationship(session, ip_list_id: str, relationship_field: st
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage IP address list relationships on Airlock Gateway."
+        description="Manage IP address list relationships on Airlock Gateway Version 8.2.\n"
+                    "By default, configuration changes are saved; use --activate to activate them."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -149,9 +149,11 @@ def main():
     parser_update.add_argument("--mapping-regex", required=True,
                                help="Regex pattern to select mappings by name")
     parser_update.add_argument("-y", "--assumeyes", action="store_true",
-                               help="Automatically answer yes for confirmation")
+                               help="Automatically confirm without prompting")
     parser_update.add_argument("-c", "--comment", default="Update IP list relationships via REST API",
                                help="Comment for the configuration change")
+    parser_update.add_argument("--activate", action="store_true",
+                               help="Activate configuration (default: save configuration)")
     args = parser.parse_args()
 
     global SESSION
@@ -168,14 +170,17 @@ def main():
         rel_field = "mappings-whitelist" if args.whitelist else "mappings-blacklist"
         result = update_ip_list_relationship(SESSION, args.ip_list_id, rel_field, args.mapping_regex, args.assumeyes)
         print(json.dumps(result, indent=4))
-        # Confirm change (unless assumeyes is provided) and then save/activate config.
         if not args.assumeyes:
-            ans = input("\nContinue to save and activate the new configuration? [y/n] ")
+            prompt_text = "\nContinue to " + ("save and activate " if args.activate else "save ") + "the new configuration? [y/n] "
+            ans = input(prompt_text)
             if ans.lower() != "y":
                 terminate_with_error("Operation cancelled.")
-        # Try to activate; if activation fails, save the config.
-        if al.activate(SESSION, args.comment):
-            print("Configuration activated successfully.")
+        if args.activate:
+            if al.activate(SESSION, args.comment):
+                print("Configuration activated successfully.")
+            else:
+                al.save_config(SESSION, args.comment)
+                print("Activation failed; configuration saved instead.")
         else:
             al.save_config(SESSION, args.comment)
             print("Configuration saved.")

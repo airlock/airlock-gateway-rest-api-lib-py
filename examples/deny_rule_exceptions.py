@@ -341,12 +341,22 @@ def main():
     elif args.command == "delete":
         delete_exception(args.mapping_regex, args.group_regex, args.identifier, args.assumeyes)
 
+    if not args.assumeyes:
+        prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
+        ans = input(prompt_text)
+        if ans.lower() != "y":
+            terminate_with_error("Operation cancelled.")
+
+    # If --activate flag is provided, attempt to activate; otherwise, simply save.
     if args.activate:
-        print("Activating configuration...")
-        al.activate(SESSION, f"{args.comment}")
+        if al.activate(SESSION, comment):
+            print("Configuration activated successfully.")
+        else:
+            al.save_config(SESSION, comment)
+            print("Activation failed; configuration saved instead.")
     else:
-        print("Saving configuration...")
-        al.save_config(SESSION, f"{args.comment}")
+        al.save_config(SESSION, comment)
+        print("Configuration saved.")
 
     al.terminate_session(SESSION)
 
