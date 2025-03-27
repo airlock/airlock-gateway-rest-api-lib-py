@@ -1,31 +1,16 @@
 #!/usr/bin/env python3
 # coding=utf-8
 """
-Script to add a custom deny rule (with a single restriction) and an associated custom deny rule group 
-to an Airlock Gateway.
+Script to add a custom deny rule (with a single restriction) and create or update an associated custom deny rule group on an Airlock Gateway.
 
 This script performs the following steps:
   1. Creates a custom deny rule using the POST /configuration/custom-deny-rules endpoint.
-     The user must supply:
-       • --deny-rule-name : Name for the custom deny rule.
-       • --pattern-type   : The type of restriction to set. Supported pattern types are:
-                             - httpMethodPattern
-                             - pathPattern
-                             - parameterNamePattern
-                             - parameterValuePattern
-                             - contentTypePattern
-                             - httpHeaderNamePattern
-                             - httpHeaderValuePattern
-       • --pattern        : The regex pattern for the restriction.
-       • --pattern-name   : (Optional) Display name for the restriction. Will be generated if empty.
-       • Optional flags: --case-ignored, --inverted, --multiple-regex.
-       • --log-only       : Enable logOnly mode (default: false). If not specified, logOnly will be false.
-  2. Creates a custom deny rule group (named as the deny rule name with " group" appended) 
-     using POST /configuration/custom-deny-rule-groups.
-  3. Connects the newly created custom deny rule with the group via a PATCH to the relationships endpoint.
-  4. Prompts (unless --assumeyes is given) and then activates (or saves) the configuration.
-
-API key is read from the file "api_key.conf" (in a [KEY] section with key "api_key") unless supplied via -k/--api-key.
+  2. Checks if a custom deny rule group with the name given by --custom-group-name exists:
+       • If it exists, the new custom deny rule is added to that group.
+       • Otherwise, a new custom deny rule group is created with that name and the custom deny rule is added to it.
+  3. Prompts (unless --assumeyes is given) and then either activates (if --activate is provided) or saves the configuration change.
+  
+API key is read from the file "api_key.conf" (which must contain a [KEY] section with key "api_key") unless supplied via the -k/--api-key flag.
 
 Command-line arguments:
   -g, --gateway         : Airlock Gateway hostname (required)
@@ -39,14 +24,15 @@ Command-line arguments:
   --inverted            : Set inverted to true (default: false)
   --multiple-regex      : Set multipleSingleLineRegex to true (default: false)
   --log-only            : Enable logOnly mode (default: false)
+  --custom-group-name   : Name for the custom deny rule group. If a group with this name already exists, add the custom deny rule to that group.
   -y, --assumeyes       : Automatically confirm without prompting
   -c, --comment         : Comment for the configuration change (default: "Add custom deny rule")
+  --activate            : Immediately activate the new configuration (by default, changes are only saved)
 
 Usage Example:
-  To create a custom deny rule that allows only GET requests (i.e. denies non‑GET),
-  and then create an associated group, run:
+  To create a custom deny rule that only allows GET requests (i.e. denies non‑GET) and to add it to a group named "ALPOOL-36269" (creating the group if needed), run:
 
-      ./create_custom_deny_rule.py \
+      ./add_custom_dr.py \
          -g mywaf.example.com \
          -k YOUR_API_KEY \
          --deny-rule-name "Deny non-GET" \
@@ -54,7 +40,8 @@ Usage Example:
          --pattern "^GET$" \
          --inverted \
          --log-only \
-         -y -c "Add custom deny rule for non-GET requests"
+         --custom-group-name "CRUD restrictions" \
+         -y -c "Add custom deny rule for non-GET requests" --activate
 """
 
 import sys
@@ -65,6 +52,7 @@ import logging
 import signal
 import json
 
+# Ensure the library is in the path.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
 
@@ -105,7 +93,7 @@ def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Add a custom deny rule (with one restriction) and create an associated custom deny rule group in log-only mode."
+        description="Add a custom deny rule (with one restriction) and create or update an associated custom deny rule group in log-only mode."
     )
     parser.add_argument("-g", "--gateway", required=True,
                         help="Airlock Gateway hostname")
@@ -118,8 +106,8 @@ def main():
                         help="Restriction type to set (e.g. httpMethodPattern, pathPattern, parameterNamePattern, parameterValuePattern, contentTypePattern, httpHeaderNamePattern, httpHeaderValuePattern)")
     parser.add_argument("--pattern", required=True,
                         help="The regex pattern for the restriction")
-    parser.add_argument("--pattern-name", default="",
-                        help="(Optional) Display name for the restriction. Will be generated if empty.")
+    parser.add_argument("--pattern-name", default="custom pattern",
+                        help="(Optional) Display name for the restriction.")
     parser.add_argument("--case-ignored", action="store_true",
                         help="Set caseIgnored to true (default: false)")
     parser.add_argument("--inverted", action="store_true",
@@ -128,10 +116,14 @@ def main():
                         help="Set multipleSingleLineRegex to true (default: false)")
     parser.add_argument("--log-only", action="store_true",
                         help="Enable logOnly mode (default: false)")
+    parser.add_argument("--custom-group-name", required=True,
+                        help="Name for the custom deny rule group. If a group with this name exists, add the custom deny rule to that group; otherwise, create a new group with this name.")
     parser.add_argument("-y", "--assumeyes", action="store_true",
                         help="Automatically confirm without prompting")
     parser.add_argument("-c", "--comment", default="Add custom deny rule",
                         help="Comment for the configuration change")
+    parser.add_argument("--activate", action="store_true",
+                        help="Immediately activate the new configuration (default is to only save)")
     args = parser.parse_args()
 
     api_key = get_api_key(args)
@@ -142,11 +134,10 @@ def main():
     al.load_active_config(SESSION)
 
     # Build the restrictions payload.
-    # If --pattern-name is empty, the backend will generate a display name.
     restriction = {
         args.pattern_type: {
             "enabled": True,
-            "name": args.pattern_name,
+            "name": args.pattern_name,  # backend will generate if empty
             "pattern": args.pattern,
             "caseIgnored": args.case_ignored,
             "inverted": args.inverted,
@@ -171,45 +162,61 @@ def main():
     new_rule_id = new_rule.get("id")
     print(f"Custom deny rule created with ID: {new_rule_id}")
 
-    # Create a custom deny rule group.
-    group_name = args.deny_rule_name + " group"
-    group_payload = {
-        "data": {
-            "type": "custom-deny-rule-group",
-            "attributes": {
-                "name": group_name
+    # Check if a custom deny rule group with the given name already exists.
+    res_groups = al.get(SESSION, "/configuration/custom-deny-rule-groups", exp_code=200)
+    existing_groups = res_groups.json().get("data", [])
+    target_group = None
+    for group in existing_groups:
+        if group.get("attributes").get("name") == args.custom_group_name:
+            target_group = group
+            break
+
+    if target_group:
+        group_id = target_group.get("id")
+        print(f"Custom deny rule group '{args.custom_group_name}' already exists with ID: {group_id}")
+    else:
+        # Create a new custom deny rule group with the given name.
+        group_payload = {
+            "data": {
+                "type": "custom-deny-rule-group",
+                "attributes": {
+                    "name": args.custom_group_name
+                }
             }
         }
-    }
-    print("Creating custom deny rule group...")
-    res_group = al.post(SESSION, "/configuration/custom-deny-rule-groups", group_payload, exp_code=201)
-    if res_group.status_code != 201:
-        terminate_with_error("Failed to create custom deny rule group.", SESSION)
-    new_group = res_group.json().get("data", {})
-    new_group_id = new_group.get("id")
-    print(f"Custom deny rule group created with ID: {new_group_id}")
+        print("Creating custom deny rule group...")
+        res_group = al.post(SESSION, "/configuration/custom-deny-rule-groups", group_payload, exp_code=201)
+        if res_group.status_code != 201:
+            terminate_with_error("Failed to create custom deny rule group.", SESSION)
+        new_group = res_group.json().get("data", {})
+        group_id = new_group.get("id")
+        print(f"Custom deny rule group created with ID: {group_id}")
 
-    # Connect the custom deny rule to the group.
+    # Connect the custom deny rule to the custom deny rule group.
     connect_payload = {
         "data": [
             {"type": "custom-deny-rule", "id": new_rule_id}
         ]
     }
-    rel_endpoint = f"/configuration/custom-deny-rule-groups/{new_group_id}/relationships/custom-deny-rules"
-    print("SKIP Connecting custom deny rule to the custom deny rule group...")
+    rel_endpoint = f"/configuration/custom-deny-rule-groups/{group_id}/relationships/custom-deny-rules"
+    print("Connecting custom deny rule to the custom deny rule group...")
     res_conn = al.patch(SESSION, rel_endpoint, connect_payload, exp_code=[204,404])
     if res_conn.status_code != 204:
         print("Failed to associate the custom deny rule with the group.")
     else:
         print("Custom deny rule successfully associated with the group.")
 
-    # Confirm and then activate or save the configuration.
+    # Confirm and then activate (if --activate is provided) or save the configuration.
     if not args.assumeyes:
         ans = input("\nContinue to save and activate the new configuration? [y/n] ")
         if ans.lower() != "y":
             terminate_with_error("Operation cancelled.", SESSION)
-    if al.activate(SESSION, args.comment):
-        print("Configuration activated successfully.")
+    if args.activate:
+        if al.activate(SESSION, args.comment):
+            print("Configuration activated successfully.")
+        else:
+            al.save_config(SESSION, args.comment)
+            print("Configuration saved.")
     else:
         al.save_config(SESSION, args.comment)
         print("Configuration saved.")
