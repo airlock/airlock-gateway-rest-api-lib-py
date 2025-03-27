@@ -12,8 +12,7 @@ versions of Airlock Gateway.
 
 A full documentation of this library is available at [Airlock's GitHub Page](https://airlock.github.io/airlock-gateway-rest-api-lib-py).
 
-An example script is provided under the `examples` folder with
-the intent to demonstrate how to use some of the library functions.
+Several example scripts are provided under the examples folder to be used as starting point for developing your own scripts.
 
 This library uses the `requests` library to perform standard HTTP requests
 to Airlock Gateway REST endpoints.
