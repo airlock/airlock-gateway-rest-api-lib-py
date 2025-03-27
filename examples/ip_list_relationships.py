@@ -105,7 +105,7 @@ def update_blacklist(session, ip_list_id: str, mapping_regex: str, force: bool) 
     mapping_info = [(mapping["id"], mapping["attributes"]["name"]) for mapping in selected_mappings]
 
     if not force:
-        print(f"About to update IP list {ip_list_id} on endpoint 'mappings-blacklist' with these mappings:")
+        print(f"About to update IP list {ip_list_id} blacklist relationship with these mappings:")
         for mapping_id, mapping_name in mapping_info:
             print(f"  ID: {mapping_id}, Name: {mapping_name}")
         ans = input("Continue with update? [y/n] ")

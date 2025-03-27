@@ -4,19 +4,19 @@
 Script to manage maintenance page settings on Airlock WAF mappings.
 Operations include:
     - Showing mappings with activated maintenance page:
-         ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a show
+         ./maintenance.py -g mywaf.example.com --mapping-regex "^mapping.*pattern$" -a show
     - Enabling/disabling maintenance on selected mappings:
-         ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a enable
-         ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a disable
+         ./maintenance.py -g mywaf.example.com --mapping-regex "^mapping.*pattern$" -a enable
+         ./maintenance.py -g mywaf.example.com --mapping-regex "^mapping.*pattern$" -a disable
     - Deleting selected mappings:
-         ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a delete
+         ./maintenance.py -g mywaf.example.com --mapping-regex "^mapping.*pattern$" -a delete
 
 By default, configuration changes are saved; add the --activate flag to activate them.
 If the API key is not provided with -k, it will be read from an "api_key.conf" file 
 (with a [KEY] section and an "api_key" value).
 
 Usage example:
-  ./maintenance.py -g my_airlock --mapping-regex "^mapping.*pattern$" -a enable -k <YOUR_API_KEY> -f --activate -c "Update deny rule group"
+  ./maintenance.py -g mywaf.example.com --mapping-regex "^mapping.*pattern$" -a enable -k <YOUR_API_KEY> -f --activate -c "Update deny rule group"
 """
 
 import sys

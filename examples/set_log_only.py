@@ -13,14 +13,18 @@ It updates the “logOnly” attribute for the specified deny rule groups on all
 selected by a regex. By default changes are saved; if the --activate flag is provided,
 the configuration will be activated after confirmation.
 
+The `--group-regex` argument takes a regex pattern matched against deny rule group short names (e.g., "SQLI_PARAM_VALUE").
+You can retrieve the list of these short names directly from your gateway's REST API endpoint, e.g. by using a browser:
+`GET https://<gateway-hostname>/airlock/rest/configuration/deny-rule-groups`
+
 API key is provided via the –k flag or read from an “api_key.conf” file (with a [KEY] section).
 
 Usage examples:
   Enable log‑only mode for deny rule groups (selected by group regex '.*') on all mappings matching “^cust”:
-      ./set_log_only.py -g my_airlock --mapping-regex '^cust' --group-regex '.*' --activate -k YOUR_API_KEY
+      ./set_log_only.py -g mywaf.example.com --mapping-regex '^cust' --group-regex '.*' --activate -k YOUR_API_KEY
 
   Disable log‑only mode (using --disable) for deny rule group 'SQL_PARAM_VALUE':
-      ./set_log_only.py -g my_airlock --mapping-regex '^cust' --group-regex 'SQL_PARAM_VALUE' --disable -k YOUR_API_KEY
+      ./set_log_only.py -g mywaf.example.com --mapping-regex '^cust' --group-regex 'SQL_PARAM_VALUE' --disable -k YOUR_API_KEY
 
   (Optionally add –y to skip confirmation and –c to provide a comment; –p to specify a port)
 """
