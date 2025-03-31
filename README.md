@@ -6,14 +6,13 @@ This library is not part of the official Airlock product delivery and
 Ergon/Airlock does not provide support for it. Best effort support may
 be provided by the contributor of the library.
 
-The current version of this library has been developed for hosts running 
-Airlock Gateway 8.2, some REST calls will not work for hosts running different
+The current version of this library has been developed and tested for hosts running 
+Airlock Gateway 8.4, some REST calls may not work for hosts running different
 versions of Airlock Gateway.
 
 A full documentation of this library is available at [Airlock's GitHub Page](https://airlock.github.io/airlock-gateway-rest-api-lib-py).
 
-An example script is provided under the `examples` folder with
-the intent to demonstrate how to use some of the library functions.
+Several example scripts are provided under the examples folder to be used as starting point for developing your own scripts.
 
 This library uses the `requests` library to perform standard HTTP requests
 to Airlock Gateway REST endpoints.

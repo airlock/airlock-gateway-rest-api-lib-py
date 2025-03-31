@@ -36,7 +36,7 @@ from requests import Session, Response
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-LIBRARY_COMPATIBILITY_VERSION = '8.2'
+LIBRARY_COMPATIBILITY_VERSIONS = ['8.2', '8.3', '8.4']
 
 
 class AirlockGatewayRestError(Exception):
@@ -214,11 +214,11 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
     if res.status_code == 200:
         version = get_version(gw_session)
         if version:
-            if not version.startswith(LIBRARY_COMPATIBILITY_VERSION):
+            if not any(version.startswith(v) for v in LIBRARY_COMPATIBILITY_VERSIONS):
                 logging.warning("You are using Airlock version %s while this \
-library version is developed for Airlock hosts running version %s. Some Rest \
-calls will not work on this Airlock version", version,
-                                LIBRARY_COMPATIBILITY_VERSION)
+                                library is tested for Airlock versions %s. Some Rest \
+                                calls might not work on this Airlock version", 
+                                version, ", ".join(LIBRARY_COMPATIBILITY_VERSIONS))
         else:
             logging.warning('The Airlock version could not be determined, \
 this library version might be incompatible with this Airlock Host')
@@ -226,7 +226,7 @@ this library version might be incompatible with this Airlock Host')
     return None
 
 
-def create_session_from_cookie(host: str, jsessionid: str) -> GatewaySession:
+def create_session_from_cookie(host: str, jsessionid: str, port: int = 443) -> GatewaySession:
     '''
     Retrieves an existing Gateway Session from the JSESSIONID Cookie.\n
     Returns the generated GatewaySession object.
@@ -235,7 +235,7 @@ def create_session_from_cookie(host: str, jsessionid: str) -> GatewaySession:
     ses.verify = False
     cookie = requests.cookies.create_cookie("JSESSIONID", jsessionid)
     ses.cookies.set_cookie(cookie)
-    return GatewaySession(host, ses)
+    return GatewaySession(host, ses, port)
 
 
 def _get_cookies(gw_session: GatewaySession) -> dict:
