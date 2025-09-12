@@ -34,6 +34,7 @@ import requests
 import urllib3
 from requests import Session, Response
 
+module_logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 LIBRARY_COMPATIBILITY_VERSIONS = ['8.2', '8.3', '8.4']
@@ -101,7 +102,7 @@ def _res_expect_handle(res: Response, exp_code: Union[list, int]) -> None:
             exp_code = [exp_code]
         if res.status_code not in exp_code:
             msg = f"Unexpected status code {res.status_code} was returned"
-            logging.error(msg)
+            module_logger.error(msg)
             raise AirlockGatewayRestError(res.status_code, res.text)
 
 
@@ -116,7 +117,7 @@ def req_raw(gw_session: GatewaySession, method: str, path: str,
     Returns the response object to the performed request.
     '''
     uri = f'https://{gw_session.host}/airlock/rest{path}'
-    logging.info("Performing a %s request at URI: %s", method, uri)
+    module_logger.info("Performing a %s request at URI: %s", method, uri)
     headers = None
     if ctype:
         headers = {'Content-Type': ctype}
@@ -136,10 +137,10 @@ def req(gw_session: GatewaySession, method: str,
     Returns the response object to the performed request.
     '''
     uri = f'https://{gw_session.host}/airlock/rest{path}'
-    logging.info("Performing a %s request at URI: %s ", method, uri)
+    module_logger.info("Performing a %s request at URI: %s ", method, uri)
     if isinstance(body_dict, dict):
-        logging.debug("JSON payload of request:")
-        logging.debug(json.dumps(body_dict, indent=4))
+        module_logger.debug("JSON payload of request:")
+        module_logger.debug(json.dumps(body_dict, indent=4))
     res = gw_session.ses.request(method, uri, json=body_dict)
     _res_expect_handle(res, exp_code)
     return res
@@ -209,19 +210,19 @@ def create_session(host: str, api_key: str, port: int = 443) -> GatewaySession:
     ses.verify = False
     gw_session = GatewaySession(host, ses, port)
     gw_session.add_headers({"Authorization": f"Bearer {api_key}"})
-    logging.info("Starting the REST Session with Host %s", host)
+    module_logger.info("Starting the REST Session with Host %s", host)
     res = post(gw_session, "/session/create", exp_code=[200, 404])
     if res.status_code == 200:
         version = get_version(gw_session)
         if version:
             if not any(version.startswith(v) for v in LIBRARY_COMPATIBILITY_VERSIONS):
-                logging.warning("You are using Airlock version %s while this \
-                                library is tested for Airlock versions %s. Some Rest \
-                                calls might not work on this Airlock version", 
-                                version, ", ".join(LIBRARY_COMPATIBILITY_VERSIONS))
+                module_logger.warning("You are using Airlock version %s while this "
+                    "library is tested for Airlock versions %s. Some Rest "
+                    "calls might not work on this Airlock version.",
+                    version, ", ".join(LIBRARY_COMPATIBILITY_VERSIONS))
         else:
-            logging.warning('The Airlock version could not be determined, \
-this library version might be incompatible with this Airlock Host')
+            module_logger.warning("The Airlock version could not be determined. "
+                "This library version might be incompatible with the specified Airlock Host.")
         return gw_session
     return None
 
@@ -281,8 +282,7 @@ def validate(gw_session: GatewaySession) -> Tuple[bool, list]:
     rdata = res.json()
     if len(rdata["data"]) > 0:
         msgs = [e["attributes"]["detail"] for e in rdata["data"]]
-        logging.info("Validation failed with the following error\
- message(s):\n %s", str(msgs))
+        module_logger.warning("Validation failed with the following error message(s):\n %s", str(msgs))
         return False, msgs
     return True, []
 
@@ -300,7 +300,7 @@ def activate(gw_session: GatewaySession, comment: str = None) -> bool:
                    "failoverActivation": False}
         data = {"comment": comment, "options": options}
     if not validate(gw_session)[0]:
-        logging.info("Configuration could not be activated as it isn't valid")
+        module_logger.warning("Configuration could not be activated as it isn't valid.")
         return False
     path = "/configuration/configurations/activate"
     post(gw_session, path, data, 200)
@@ -320,8 +320,7 @@ def save_config(gw_session: GatewaySession, comment: str = None) -> str:
     path = "/configuration/configurations/save"
     res = post(gw_session, path, data, [200, 400])
     if res.status_code == 400:
-        logging.warning("Configuration could not be saved\
- as no configuration was loaded!")
+        module_logger.warning("Configuration could not be saved as no configuration was loaded!")
         return None
     return res.json()['data']['id']
 
@@ -331,7 +330,7 @@ def update_license(gw_session: GatewaySession, lic_str: str) -> None:
     Updates the license on the Airlock Host.
     '''
     res = get(gw_session, '/configuration/license')
-    logging.debug("Current license: \n %s", json.dumps(res.json(), indent=4))
+    module_logger.debug("Current license: \n %s", json.dumps(res.json(), indent=4))
 
     lic_patch_data = {
         "data": {
@@ -575,7 +574,7 @@ def export_mappings(gw_session: GatewaySession,
                 with zip_file.open("alec_table.xml", "r") as mapping_xml:
                     mapping_xmls.append(mapping_xml.read())
         else:
-            logging.info("Mapping with ID %s was not found on Airlock Host",
+            module_logger.info("Mapping with ID %s was not found on Airlock Host.",
                          mapping_id)
 
     gw_session.add_headers({"Accept": "application/json"})
