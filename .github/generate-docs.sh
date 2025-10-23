@@ -12,7 +12,7 @@ pip install -U pip setuptools wheel pdoc
 pip install -U .
 
 # create api doc
-pdoc src/airlock_gateway_rest_api_lib/airlock_gateway_rest_api_lib.py -o docs
+pdoc . -o docs
 
 # commit doc changes..
 if [ $(git status docs -s | wc -l) -gt 0 ]
