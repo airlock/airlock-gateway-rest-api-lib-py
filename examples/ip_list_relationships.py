@@ -37,34 +37,21 @@ import os
 import argparse
 import configparser
 import logging
-import signal
-import re
 import json
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session
 
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
 SESSION = None
 DEFAULT_API_KEY_FILE = "api_key.conf"
 
-def terminate_with_error(message=None):
-    if message:
-        print(message)
-    al.terminate_session(SESSION)
-    sys.exit(1)
-
-def register_cleanup_handler():
-    def cleanup(signum, frame):
-        al.terminate_session(SESSION)
-        sys.exit("Session terminated due to signal.")
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGSEGV, signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, cleanup)
 
 def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     if args.api_key:
@@ -98,7 +85,7 @@ def update_blacklist(session, ip_list_id: str, mapping_regex: str, force: bool) 
     # Retrieve selected mappings by regex.
     selected_mappings = al.select_mappings(session, pattern=mapping_regex)
     if not selected_mappings:
-        terminate_with_error("No mappings found matching the regex.")
+        terminate_session_with_error(SESSION, "No mappings found matching the regex.")
 
     # Build the payload with mapping references.
     mapping_refs = [{"type": "mapping", "id": mapping["id"]} for mapping in selected_mappings]
@@ -110,7 +97,7 @@ def update_blacklist(session, ip_list_id: str, mapping_regex: str, force: bool) 
             print(f"  ID: {mapping_id}, Name: {mapping_name}")
         ans = input("Continue with update? [y/n] ")
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
 
     endpoint = f"/configuration/ip-address-lists/{ip_list_id}/relationships/mappings-blacklist"
     payload = {"data": mapping_refs}
@@ -134,7 +121,7 @@ def update_whitelist(session, ip_list_id: str, mapping_regex: str, path_pattern:
     """
     selected_mappings = al.select_mappings(session, pattern=mapping_regex)
     if not selected_mappings:
-        terminate_with_error("No mappings found matching the regex.")
+        terminate_session_with_error(SESSION, "No mappings found matching the regex.")
 
     updated = []
     for mapping in selected_mappings:
@@ -227,13 +214,9 @@ def main():
                                help="Activate configuration (default: save configuration)")
     args = parser.parse_args()
 
-    global SESSION
     api_key = get_api_key(args)
-    SESSION = al.create_session(args.gateway, api_key, args.port)
-    if not SESSION:
-        sys.exit("Could not create session. Check gateway, port, and API key.")
-    register_cleanup_handler()
-    al.load_active_config(SESSION)
+    global SESSION
+    SESSION = setup_session(args.gateway, api_key, args.port)
 
     if args.command == "list":
         list_ip_lists(SESSION)
@@ -251,7 +234,7 @@ def main():
             prompt_text = "\nContinue to " + ("save and activate " if args.activate else "save ") + "the new configuration? [y/n] "
             ans = input(prompt_text)
             if ans.lower() != "y":
-                terminate_with_error("Operation cancelled.")
+                terminate_session_with_error(SESSION, "Operation cancelled.")
         if args.activate:
             if al.activate(SESSION, args.comment):
                 print("Configuration activated successfully.")

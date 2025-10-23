@@ -49,34 +49,18 @@ import os
 import argparse
 import configparser
 import logging
-import signal
-import json
 
-# Ensure the library is in the path.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session
 
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
 DEFAULT_API_KEY_FILE = "api_key.conf"
-
-def terminate_with_error(message=None, session=None):
-    if message:
-        print(message)
-    if session:
-        al.terminate_session(session)
-    sys.exit(1)
-
-def register_cleanup_handler(session):
-    def cleanup(signum, frame):
-        al.terminate_session(session)
-        sys.exit("Session terminated due to signal.")
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGSEGV, signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, cleanup)
 
 def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     if args.api_key:
@@ -127,11 +111,10 @@ def main():
     args = parser.parse_args()
 
     api_key = get_api_key(args)
-    SESSION = al.create_session(args.gateway, api_key, args.port)
-    if not SESSION:
-        sys.exit("Could not create session. Check gateway, port, and API key.")
-    register_cleanup_handler(SESSION)
-    al.load_active_config(SESSION)
+
+
+    SESSION = setup_session(args.gateway, api_key, args.port)
+
 
     # Build the restrictions payload.
     restriction = {
@@ -157,7 +140,7 @@ def main():
     print("Creating custom deny rule...")
     res_rule = al.post(SESSION, "/configuration/custom-deny-rules", custom_rule_payload, exp_code=201)
     if res_rule.status_code != 201:
-        terminate_with_error("Failed to create custom deny rule.", SESSION)
+        terminate_session_with_error(SESSION, "Failed to create custom deny rule.")
     new_rule = res_rule.json().get("data", {})
     new_rule_id = new_rule.get("id")
     print(f"Custom deny rule created with ID: {new_rule_id}")
@@ -187,7 +170,7 @@ def main():
         print("Creating custom deny rule group...")
         res_group = al.post(SESSION, "/configuration/custom-deny-rule-groups", group_payload, exp_code=201)
         if res_group.status_code != 201:
-            terminate_with_error("Failed to create custom deny rule group.", SESSION)
+            terminate_session_with_error(SESSION, "Failed to create custom deny rule group.")
         new_group = res_group.json().get("data", {})
         group_id = new_group.get("id")
         print(f"Custom deny rule group created with ID: {group_id}")
@@ -210,17 +193,17 @@ def main():
         prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
         ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
 
     # If --activate flag is provided, attempt to activate; otherwise, simply save.
     if args.activate:
-        if al.activate(SESSION, comment):
+        if al.activate(SESSION, args.comment):
             print("Configuration activated successfully.")
         else:
-            al.save_config(SESSION, comment)
+            al.save_config(SESSION, args.comment)
             print("Activation failed; configuration saved instead.")
     else:
-        al.save_config(SESSION, comment)
+        al.save_config(SESSION, args.comment)
         print("Configuration saved.")
 
     al.terminate_session(SESSION)
