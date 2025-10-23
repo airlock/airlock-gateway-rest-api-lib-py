@@ -24,12 +24,10 @@ import os
 import argparse
 import configparser
 import logging
-import signal
 import re
-import json
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session
 
 # Configure logging
 logging.basicConfig(
@@ -37,26 +35,11 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
 # Global session variable
-SESSION = None
 DEFAULT_API_KEY_FILE = "api_key.conf"
 
-def terminate_with_error(message=None):
-    """Terminate the session and exit with an error message."""
-    if message:
-        print(message)
-    al.terminate_session(SESSION)
-    sys.exit(1)
-
-def register_cleanup_handler():
-    """Register signal handlers to terminate the session on interruption."""
-    def cleanup(signum, frame):
-        al.terminate_session(SESSION)
-        sys.exit("Session terminated due to signal.")
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGINT, signal.SIGSEGV,
-                signal.SIGTERM, signal.SIGQUIT):
-        signal.signal(sig, cleanup)
 
 def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     """Return the API key from command line or config file."""
@@ -72,9 +55,9 @@ def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     else:
         sys.exit("API key needed, either via -k option or in an api_key.conf file.")
 
-def get_selected_mappings(SESSION, mapping_pattern):
+def get_selected_mappings(session, mapping_pattern):
     """Return a sorted list of mappings whose names match the given pattern."""
-    all_mappings = al.get_all_mappings(SESSION)
+    all_mappings = al.get_all_mappings(session)
     selected = [m for m in all_mappings if re.search(mapping_pattern, m["attributes"]["name"])]
     return sorted(selected, key=lambda m: m["attributes"]["name"])
 
@@ -112,7 +95,7 @@ def main():
                         help="Gateway HTTPS port (default: 443)")
     parser.add_argument("-c", "--comment", default="Script: {action} deny rule group for all mappings",
                         help="Comment for the configuration change")
-    global args
+
     args = parser.parse_args()
 
     # Process the comment: replace placeholders if present.
@@ -120,18 +103,12 @@ def main():
 
     api_key = get_api_key(args, DEFAULT_API_KEY_FILE)
 
-    global SESSION
-    SESSION = al.create_session(args.gateway, api_key, args.port)
-    if not SESSION:
-        sys.exit("Could not create session. Check gateway, port, and API key.")
-
-    register_cleanup_handler()
-    al.load_active_config(SESSION)
+    SESSION = setup_session(args.gateway, api_key, args.port)
 
     # Get selected mappings based on the provided regex.
     mappings = get_selected_mappings(SESSION, args.mapping_regex)
     if not mappings:
-        terminate_with_error("No mappings found matching the selector pattern.")
+        terminate_session_with_error(SESSION, "No mappings found matching the selector pattern.")
 
     if args.action == "show":
         print("Mapping Name, Maintenance Page Status")
@@ -181,7 +158,7 @@ def main():
         prompt_text += "the new configuration? [y/n] "
         ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
 
     # Save or activate the configuration based on --activate flag.
     if args.activate:

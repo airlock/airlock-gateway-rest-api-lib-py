@@ -7,3 +7,9 @@ The scripts are not part of the official Airlock product delivery, and Ergon/Air
 As the name of the directory suggests, these scripts are **examples**. They are independent of one another, may vary in coding style and quality, and should serve as a starting point for your own customizations.
 
 **Your use of any script is at your own risk and without warranty of any kind.**
+
+
+For the package imports in the examples to work properly run the module as a script from outside the repository e.g.
+```
+python3 -m airlock_gateway_rest_api_lib.examples.enable_deny_rule_group
+```

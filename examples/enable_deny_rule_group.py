@@ -19,12 +19,11 @@ import os
 import argparse
 import configparser
 import logging
-import signal
 import json
 
-# Extend the sys.path to find the library if needed.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session
+
 
 # Configure logging
 logging.basicConfig(
@@ -32,27 +31,11 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
 # Global session variable
 SESSION = None
 DEFAULT_API_KEY_FILE = "api_key.conf"
-
-def terminate_with_error(message=None):
-    """Terminate the session and exit with an error message."""
-    if message:
-        print(message)
-    al.terminate_session(SESSION)
-    sys.exit(1)
-
-def register_cleanup_handler():
-    """
-    Cleanup handler; terminates the session if a program error occurs.
-    """
-    def cleanup(signum, frame):
-        al.terminate_session(SESSION)
-        sys.exit("Session terminated due to signal.")
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGINT, signal.SIGSEGV, signal.SIGTERM, signal.SIGQUIT):
-        signal.signal(sig, cleanup)
 
 def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
     if args.api_key:
@@ -96,18 +79,13 @@ def main():
 
     # Create a new session.
     global SESSION
-    SESSION = al.create_session(args.gateway, api_key, args.port)
-    if not SESSION:
-        sys.exit("Could not create session. Check gateway, port, and API key.")
+    SESSION = setup_session(args.gateway, api_key, args.port)
 
-    register_cleanup_handler()
-    # Load the currently active configuration.
-    al.load_active_config(SESSION)
 
     # Retrieve all mappings.
     mappings = al.get_all_mappings(SESSION)
     if not mappings:
-        terminate_with_error("No mappings found.")
+        terminate_session_with_error(SESSION, "No mappings found.")
 
     enable_flag = True if args.action == "enable" else False
 
@@ -136,7 +114,7 @@ def main():
         prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
         ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
 
     # If --activate flag is provided, attempt to activate; otherwise, simply save.
     if args.activate:

@@ -16,13 +16,11 @@
 # objects that describe mappings, backends and virtual host from
 # the logs.
 
-import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
-
-import signal
 import argparse
 import logging
+
+import airlock_gateway_rest_api_lib as al
+from .utils import setup_session
 
 logging.basicConfig(level=logging.DEBUG, filename='last_run.log',
                     format='%(asctime)s %(levelname)s %(message)s', 
@@ -30,17 +28,6 @@ logging.basicConfig(level=logging.DEBUG, filename='last_run.log',
 HOST = "airlock-gateway.local"
 PORT = 443
 
-def register_cleanup_handler():
-    '''
-    Cleanup handler, will terminate the session if a program error
-    occurs at runtime.
-    '''
-    def cleanup(signum, frame):
-        al.terminate_session("Terminate session")
-
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGINT, signal.SIGSEGV,
-                signal.SIGTERM):
-        signal.signal(sig, cleanup)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -49,10 +36,7 @@ def main():
     parser.add_argument('-k', '--key', help="API Key for Airlock Host", required=True)
     args = parser.parse_args()
 
-    gw_s = al.create_session(args.gateway, args.key, args.port)
-
-    # Makes sure the loaded configuration matches the currently active one.
-    al.load_active_config(gw_s)
+    gw_s = setup_session(args.gateway, args.key, args.port)
 
     # Save backup of original config file
     al.export_current_config_file(gw_s, "./config.zip")
@@ -98,8 +82,8 @@ def main():
 
     al.save_config(gw_s, "Save after connecting mappings")
 
-    for id in ids:
-        al.delete_mapping_by_id(gw_s, id)
+    for mapping_id in ids:
+        al.delete_mapping_by_id(gw_s, mapping_id)
     
     al.delete_backend_group_by_id(gw_s, beg_id)
     al.delete_virtual_host_by_id(gw_s, vh_id)

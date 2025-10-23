@@ -44,16 +44,14 @@ List exceptions from all "MyBank"-mappings:
 """
 
 import argparse
-import click
 import configparser
 import logging
 import os
 import re
-import signal
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session, confirm_prompt
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -61,36 +59,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
-
-def register_cleanup_handler():
-    """
-    Cleanup handler, will terminate the session if a program error
-    occurs at runtime.
-    """
-
-    def cleanup(signum, frame):
-        al.terminate_session(SESSION)
-
-    for sig in (
-        signal.SIGABRT,
-        signal.SIGILL,
-        signal.SIGINT,
-        signal.SIGSEGV,
-        signal.SIGTERM,
-        signal.SIGQUIT,
-    ):
-        signal.signal(sig, cleanup)
-
-def terminate_with_error(message=None):
-    """
-    Terminate the session and exit with an error message.
-    """
-    if message:
-        print(message)
-    al.terminate_session(SESSION)
-    sys.exit(1)
-
+SESSION = None
 
 def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
     """
@@ -100,7 +71,7 @@ def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
     selected_mappings = al.select_mappings(SESSION, mapping_regex)
 
     if not selected_mappings:
-        terminate_with_error("No mappings selected")
+        terminate_session_with_error(SESSION, "No mappings selected")
 
     selected_groups = []
     for dr in al.get_deny_rule_groups(SESSION):
@@ -108,14 +79,14 @@ def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
             selected_groups.append(dr)
 
     if not selected_groups:
-        terminate_with_error("No deny-rule groups selected")
+        terminate_session_with_error(SESSION, "No deny-rule groups selected")
 
     print("Selected mappings:")
     [print("\t" + mapping["attributes"]["name"]) for mapping in selected_mappings]
     print("Selected deny-rule groups:")
     [print("\t" + group["attributes"]["name"]) for group in selected_groups]
-    if not assumeyes and not click.confirm("Do you want to continue?", default=True):
-        terminate_with_error("")
+    if not assumeyes and not confirm_prompt("Do you want to continue?", default=True):
+        terminate_session_with_error(SESSION)
 
     return selected_mappings, selected_groups
 
@@ -137,7 +108,7 @@ def add_exception(mapping_regex, group_regex, parameter_name_pattern, header_nam
                         already exists in mapping "{mapping["attributes"]["name"]}"
                         and deny-rule group "{group["attributes"]["name"]}"'''
                     )
-                    terminate_with_error("Use the delete command to remove these exceptions or choose a different identifier")
+                    terminate_session_with_error(SESSION, "Use the delete command to remove these exceptions or choose a different identifier")
 
                 if "headerNamePattern" in exception and exception["headerNamePattern"]["name"] == identifier:
                     print(
@@ -145,7 +116,7 @@ def add_exception(mapping_regex, group_regex, parameter_name_pattern, header_nam
                         already exists in mapping "{mapping["attributes"]["name"]}"
                         and deny-rule group "{group["attributes"]["name"]}"'''
                     )
-                    terminate_with_error("Use the delete command to remove these exceptions or choose a different identifier")
+                    terminate_session_with_error(SESSION, "Use the delete command to remove these exceptions or choose a different identifier")
 
     if parameter_name_pattern:
         pattern = "parameterNamePattern"
@@ -198,7 +169,7 @@ def delete_exception(mapping_regex, group_regex, identifier, assumeyes):
     if deleted_something:
         return
 
-    terminate_with_error(f'No exceptions with identifier "{identifier}" found')
+    terminate_session_with_error(SESSION, f'No exceptions with identifier "{identifier}" found')
 
 
 def list_exceptions(mapping_regex, group_regex):
@@ -218,6 +189,9 @@ def list_exceptions(mapping_regex, group_regex):
             deny_rule_group_data = al.get_mapping_deny_rule_group(*group_ids)
             exceptions = deny_rule_group_data["attributes"]["exceptions"]
             for exception in exceptions:
+                name = None
+                pattern = None
+                # TODO: robustness for all exception types
                 if "parameterNamePattern" in exception:
                     name = exception["parameterNamePattern"]["name"]
                     pattern = exception["parameterNamePattern"]["pattern"]
@@ -231,8 +205,8 @@ def list_exceptions(mapping_regex, group_regex):
                         mapping["attributes"]["name"],
                         group["attributes"]["name"],
                         type,
-                        name,
-                        pattern,
+                        name if name else "<n/a>",
+                        pattern if pattern else "<n/a>",
                     ]
                 )
 
@@ -302,16 +276,8 @@ def main():
     else:
         sys.exit("API key needed, either with -k flag or in a api_key.conf file")
 
-    try:
-        global SESSION
-        SESSION = al.create_session(args.gateway, api_key, args.port)
-    except Exception as e:
-        sys.exit("There was an error creating the session: are the gateway URL, port and API key valid?")
-
-    register_cleanup_handler()
-
-    # Makes sure the loaded configuration matches the currently active one.
-    al.load_active_config(SESSION)
+    global SESSION
+    SESSION = setup_session(args.gateway, api_key, args.port)
 
     # Save backup of original config file
     # al.export_current_config_file(session, "./config.zip")
@@ -332,17 +298,17 @@ def main():
         prompt_text = "\nContinue to activate the new configuration? [y/n] " if args.activate else "\nContinue to save the new configuration? [y/n] "
         ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
 
     # If --activate flag is provided, attempt to activate; otherwise, simply save.
     if args.activate:
-        if al.activate(SESSION, comment):
+        if al.activate(SESSION, args.comment):
             print("Configuration activated successfully.")
         else:
-            al.save_config(SESSION, comment)
+            al.save_config(SESSION, args.comment)
             print("Activation failed; configuration saved instead.")
     else:
-        al.save_config(SESSION, comment)
+        al.save_config(SESSION, args.comment)
         print("Configuration saved.")
 
     al.terminate_session(SESSION)

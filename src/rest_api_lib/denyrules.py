@@ -8,8 +8,7 @@ from . import airlock_gateway_rest_requests_lib as al
 module_logger = logging.getLogger(__name__)
 
 
-#builtin
-
+# Built-in deny rule lib calls
 def get_mapping_deny_rule_group(gw_session: al.GatewaySession, mapping_id: str,
                                 denyrule_group_shortname: str) -> dict:
     '''
@@ -111,7 +110,7 @@ def get_deny_rule(gw_session: al.GatewaySession, short_name: str) -> dict:
     return res.json().get("data")
 
 
-#### lib calls for custom deny rules
+# Custom deny rule lib calls
 def get_mapping_custom_deny_rule_group(gw_session: al.GatewaySession, mapping_id: str,
                                 custom_denyrule_group_id: str) -> dict:
     '''

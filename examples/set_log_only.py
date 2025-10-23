@@ -34,11 +34,10 @@ import os
 import argparse
 import configparser
 import logging
-import signal
 import re
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.airlock_gateway_rest_api_lib import airlock_gateway_rest_api_lib as al
+import airlock_gateway_rest_api_lib as al
+from .utils import terminate_session_with_error, setup_session
 
 # Configure logging
 logging.basicConfig(
@@ -46,22 +45,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
+module_logger = logging.getLogger(__name__)
 
 SESSION = None
-
-def terminate_with_error(message=None):
-    if message:
-        print(message)
-    al.terminate_session(SESSION)
-    sys.exit(1)
-
-def register_cleanup_handler():
-    def cleanup(signum, frame):
-        al.terminate_session(SESSION)
-        sys.exit("Session terminated due to signal.")
-    for sig in (signal.SIGABRT, signal.SIGILL, signal.SIGINT, signal.SIGSEGV,
-                signal.SIGTERM, signal.SIGQUIT):
-        signal.signal(sig, cleanup)
 
 def get_api_key(args, key_file="api_key.conf"):
     if args.api_key:
@@ -79,13 +65,13 @@ def get_api_key(args, key_file="api_key.conf"):
 def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
     selected_mappings = al.select_mappings(SESSION, pattern=mapping_regex)
     if not selected_mappings:
-        terminate_with_error("No mappings selected")
+        terminate_session_with_error(SESSION, "No mappings selected")
     selected_groups = []
     for dr_group in al.get_deny_rule_groups(SESSION):
         if re.search(group_regex, dr_group["attributes"]["name"]):
             selected_groups.append(dr_group)
     if not selected_groups:
-        terminate_with_error("No deny-rule groups selected")
+        terminate_session_with_error(SESSION, "No deny-rule groups selected")
     print("Selected mappings:")
     for m in selected_mappings:
         print("\t" + m["attributes"]["name"])
@@ -95,7 +81,7 @@ def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
     if not assumeyes:
         ans = input("Do you want to continue? [y/n] ")
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled by user.")
+            terminate_session_with_error(SESSION, "Operation cancelled by user.")
     return selected_mappings, selected_groups
 
 def update_logonly_mode(mapping_regex, group_regex, log_only_value, assumeyes):
@@ -135,13 +121,7 @@ def main():
 
     global SESSION
     api_key = get_api_key(args)
-    SESSION = al.create_session(args.gateway, api_key, args.port)
-    if not SESSION:
-        sys.exit("Could not create session. Check gateway, port, and API key.")
-    register_cleanup_handler()
-
-    # Load the active configuration
-    al.load_active_config(SESSION)
+    SESSION = setup_session(args.gateway, api_key, args.port)
 
     # Determine desired logOnly mode
     log_only_value = False if args.disable else True
@@ -164,7 +144,7 @@ def main():
         prompt_text += "the new configuration? [y/n] "
         ans = input(prompt_text)
         if ans.lower() != "y":
-            terminate_with_error("Operation cancelled.")
+            terminate_session_with_error(SESSION, "Operation cancelled.")
     if args.activate:
         if al.activate(SESSION, args.comment):
             print("Configuration activated successfully.")
