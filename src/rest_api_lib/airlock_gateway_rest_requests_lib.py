@@ -142,6 +142,13 @@ def req(gw_session: GatewaySession, method: str,
         module_logger.debug("JSON payload of request:")
         module_logger.debug(json.dumps(body_dict, indent=4))
     res = gw_session.ses.request(method, uri, json=body_dict)
+    if module_logger.isEnabledFor(logging.DEBUG):
+        module_logger.debug("Response status code: %s", res.status_code)
+        module_logger.debug("Response payload:")
+        try:
+            module_logger.debug(json.dumps(res.json(), indent=4))
+        except json.JSONDecodeError:
+            module_logger.debug(res.text)
     _res_expect_handle(res, exp_code)
     return res
 
@@ -852,107 +859,6 @@ def disconnect_map_to_beg(gw_session: GatewaySession, mapping_id: str,
     path = f'/configuration/mappings/{map_id}/relationships/back-end-groups'
     res = delete(gw_session, path, data, [204, 404])
     return res.status_code == 204
-
-
-def get_mapping_deny_rule_group(gw_session: GatewaySession, mapping_id: str,
-                                denyrule_group_shortname: str) -> dict:
-    '''
-    Returns a dictionary object describing the deny rule group in the
-    specified Mapping, or None if the mapping or shortname specified were not
-    found.
-    '''
-    path = f'/configuration/mappings/{mapping_id}/deny-rule-groups/{denyrule_group_shortname}'
-    res = get(gw_session, path, exp_code=[200, 404])
-    return res.json().get('data')
-
-
-def update_mapping_deny_rule_group(gw_session: GatewaySession, mapping_id: str,
-                                   denyrule_group_shortname: str,
-                                   attributes: dict) -> bool:
-    '''
-    Updates the settings for a deny rule group within a specified mapping.
-    Returns True if successful, and False if if the mapping or shortname
-    specified were not found.
-    '''
-    path = f'/configuration/mappings/{mapping_id}/deny-rule-groups/{denyrule_group_shortname}'
-    data = {
-        "data": {
-            "type": "mapping-deny-rule-group",
-            "attributes": attributes
-        }
-    }
-    res = patch(gw_session, path, data, exp_code=[200, 404])
-    return res.status_code == 200
-
-
-def get_mapping_deny_rule(gw_session: GatewaySession, mapping_id: str,
-                          denyrule_shortname: str) -> dict:
-    '''
-    Returns a dictionary object describing the deny rule in the specified
-    Mapping, or None if the mapping or shortname specified were not found.
-    '''
-    path = f'/configuration/mappings/{mapping_id}/deny-rules/{denyrule_shortname}'
-    res = get(gw_session, path, exp_code=[200, 404])
-    return res.json().get("data")
-
-
-def update_mapping_deny_rule(gw_session: GatewaySession, mapping_id: str,
-                             denyrule_shortname: str, attributes: dict) -> bool:
-    '''
-    Updates the settings for a deny rule within a specified mapping. Returns
-    True if successful, and False if if the mapping or shortname specified
-    were not found.
-    '''
-    path = f'/configuration/mappings/{mapping_id}/deny-rules/{denyrule_shortname}'
-    data = {
-        "data": {
-            "type": "mapping-deny-rule",
-            "attributes": attributes
-        }
-    }
-    res = patch(gw_session, path, data, exp_code=[200, 404])
-    return res.status_code == 200
-
-
-def get_deny_rule_groups(gw_session: GatewaySession) -> dict:
-    '''
-    Returns a list of all deny rule groups on the Airlock Host.
-    '''
-
-    path = '/configuration/deny-rule-groups'
-    res = get(gw_session, path, exp_code=200)
-    return res.json().get("data")
-
-
-def get_deny_rule_group(gw_session: GatewaySession, short_name: str) -> dict:
-    '''
-    Returns a dictionary object describing the specified deny rule group,
-    or None if it does not exist.
-    '''
-
-    path = f'/configuration/deny-rule-groups/{short_name}'
-    res = get(gw_session, path, exp_code=[200, 404])
-    return res.json().get("data")
-
-
-def get_deny_rules(gw_session: GatewaySession) -> list:
-    '''
-    Returns a list of all deny-rules on the Airlock Host.
-    '''
-
-    path = '/configuration/deny-rules'
-    res = get(gw_session, path, exp_code=200)
-    return res.json().get("data")
-
-
-def get_deny_rule(gw_session: GatewaySession, short_name: str) -> dict:
-    '''
-    Returns a dictionary object describing the specified deny-rule, or None
-    if it does not exist.
-    '''
-    path = f'/configuration/deny-rules/{short_name}'
-    res = get(gw_session, path, exp_code=[200, 404])
-    return res.json().get("data")
 
 
 def load_config(gw_session: GatewaySession, config_id: int,
