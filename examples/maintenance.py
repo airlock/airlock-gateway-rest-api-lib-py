@@ -26,7 +26,7 @@ import configparser
 import logging
 import re
 
-import airlock_gateway_rest_api_lib as al
+from ..src import rest_api_lib as al
 from .utils import terminate_session_with_error, setup_session
 
 # Configure logging

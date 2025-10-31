@@ -50,7 +50,7 @@ import os
 import re
 import sys
 
-import airlock_gateway_rest_api_lib as al
+from ..src import rest_api_lib as al
 from .utils import terminate_session_with_error, setup_session, confirm_prompt
 
 logging.basicConfig(
