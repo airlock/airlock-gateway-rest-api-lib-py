@@ -2,12 +2,36 @@
 # coding=utf-8
 
 import sys
+import os
 import logging
 import signal
+import configparser
 
 from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
 
 module_logger = logging.getLogger(__name__)
+
+
+def get_api_key(args, key_file=None):
+    module_logger.debug("Retrieving API key...")
+    if args.api_key:
+        module_logger.debug("Using API key from command line argument")
+        return args.api_key.strip()
+
+    if key_file is None:
+        module_logger.debug("Using default api_key.conf file for API key")
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        key_file = os.path.join(module_dir, "api_key.conf")
+
+    if not os.path.exists(key_file):
+        sys.exit("API key needed, either via -k option or in an api_key.conf file.")
+
+    config = configparser.ConfigParser()
+    config.read(key_file)
+    api_key = config.get("KEY", "api_key", fallback=None)
+    if api_key:
+        return api_key.strip()
+    sys.exit(f"Error reading API key from {key_file}")
 
 
 def end_sessions(session_list: list[al.GatewaySession]) -> None:

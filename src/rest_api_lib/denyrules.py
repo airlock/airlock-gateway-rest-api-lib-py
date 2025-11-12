@@ -210,3 +210,69 @@ def get_custom_deny_rule(gw_session: al.GatewaySession, custom_denyrule_id: str)
     path = f'/configuration/custom-deny-rules/{custom_denyrule_id}'
     res = al.get(gw_session, path, exp_code=[200, 404])
     return res.json().get("data")
+
+
+# Functions to switch logOnly mode on or off
+# for both built-in and custom deny rules and deny rule groups
+def set_built_in_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
+                                   denyrule_shortname: str, log_only: bool) -> bool:
+    '''
+    Sets the logOnly attribute for a built-in deny rule on a specified mapping.
+    Returns True if successful, False otherwise.
+    '''
+    return update_mapping_deny_rule(gw_session, mapping_id, denyrule_shortname, {"logOnly": log_only})
+
+
+def set_custom_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
+                                 custom_denyrule_id: str, log_only: bool) -> bool:
+    '''
+    Sets the logOnly attribute for a custom deny rule on a specified mapping.
+    Returns True if successful, False otherwise.
+    '''
+    return update_mapping_custom_deny_rule(gw_session, mapping_id, custom_denyrule_id, {"logOnly": log_only})
+
+
+def set_builtin_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
+                                       group_shortname: str, log_only: bool) -> bool:
+    '''
+    Sets the logOnly attribute for a built-in deny rule group on a specified mapping and all its rules.
+    Returns True if all is successful, False if atleast one update was unsuccessful.
+    '''
+    res = update_mapping_deny_rule_group(gw_session, mapping_id, group_shortname, {"logOnly": log_only})
+    if not res:
+        return res
+
+    # Get all rules in group
+    group_obj = get_deny_rule_group(gw_session, group_shortname)
+    all_shortNames_in_group = set()
+    for rules in group_obj["attributes"]["denyRules"]:
+        for shortName in rules["shortNames"]:
+            all_shortNames_in_group.add(shortName)
+
+    # Also update all rules in group
+    for shortName in all_shortNames_in_group:
+        res = set_built_in_deny_rule_logonly(gw_session, mapping_id, shortName, log_only) and res
+    return res
+
+
+def set_custom_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
+                                      custom_denyrule_group_id: str, log_only: bool) -> bool:
+    '''
+    Sets the logOnly attribute for a custom deny rule group on a specified mapping.
+    Returns True if successful, False otherwise.
+    '''
+    res = update_mapping_custom_deny_rule_group(gw_session, mapping_id, custom_denyrule_group_id, {"logOnly": log_only})
+    if not res:
+        return res
+
+    # Get all rules in group
+    group_obj = get_custom_deny_rule_group(gw_session, custom_denyrule_group_id)
+    all_rule_ids_in_group = set()
+    for rules in group_obj["relationships"]["custom-deny-rules"]["data"]:
+        for rule_id in rules["id"]:
+            all_rule_ids_in_group.add(rule_id)
+
+    # Also update all rules in group
+    for rule_id in all_rule_ids_in_group:
+        res = set_custom_deny_rule_logonly(gw_session, mapping_id, rule_id, log_only) and res
+    return res

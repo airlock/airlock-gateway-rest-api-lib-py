@@ -19,7 +19,7 @@
 import argparse
 import logging
 
-from ..src import rest_api_lib as al
+from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
 from .utils import setup_session
 
 logging.basicConfig(level=logging.DEBUG, filename='last_run.log',
