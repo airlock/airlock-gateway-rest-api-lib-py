@@ -37,7 +37,7 @@ from requests import Session, Response
 module_logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-LIBRARY_COMPATIBILITY_VERSIONS = ['8.2', '8.3', '8.4']
+LIBRARY_COMPATIBILITY_VERSIONS = ['8.2', '8.3', '8.4', '8.5']
 
 
 class AirlockGatewayRestError(Exception):
@@ -139,14 +139,13 @@ def req(gw_session: GatewaySession, method: str,
     uri = f'https://{gw_session.host}/airlock/rest{path}'
     module_logger.info("Performing a %s request at URI: %s ", method, uri)
     if isinstance(body_dict, dict):
-        module_logger.debug("JSON payload of request:")
-        module_logger.debug(json.dumps(body_dict, indent=4))
+        module_logger.debug("JSON payload of request:\n%s", json.dumps(body_dict, indent=4))
     res = gw_session.ses.request(method, uri, json=body_dict)
     if module_logger.isEnabledFor(logging.DEBUG):
         module_logger.debug("Response status code: %s", res.status_code)
         module_logger.debug("Response payload:")
         try:
-            module_logger.debug(json.dumps(res.json(), indent=4))
+            module_logger.debug("\n%s", json.dumps(res.json(), indent=4))
         except json.JSONDecodeError:
             module_logger.debug(res.text)
     _res_expect_handle(res, exp_code)

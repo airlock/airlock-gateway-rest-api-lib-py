@@ -44,14 +44,11 @@ Usage Example:
          -y -c "Add custom deny rule for non-GET requests" --activate
 """
 
-import sys
-import os
 import argparse
-import configparser
 import logging
 
-from ..src import rest_api_lib as al
-from .utils import terminate_session_with_error, setup_session
+from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
+from .utils import terminate_session_with_error, setup_session, get_api_key
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -60,22 +57,8 @@ logging.basicConfig(
 )
 module_logger = logging.getLogger(__name__)
 
-DEFAULT_API_KEY_FILE = "api_key.conf"
 
-def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
-    if args.api_key:
-        return args.api_key.strip()
-    elif os.path.exists(key_file):
-        config = configparser.ConfigParser()
-        config.read(key_file)
-        try:
-            return config.get("KEY", "api_key").strip()
-        except Exception as e:
-            sys.exit(f"Error reading API key from {key_file}: {e}")
-    else:
-        sys.exit("API key needed, either via -k option or in an api_key.conf file.")
-
-def main():
+def setup_argparser():
     parser = argparse.ArgumentParser(
         description="Add a custom deny rule (with one restriction) and create or update an associated custom deny rule group in log-only mode."
     )
@@ -108,6 +91,11 @@ def main():
                         help="Comment for the configuration change")
     parser.add_argument("--activate", action="store_true",
                         help="Immediately activate the new configuration (default is to only save)")
+    return parser
+
+
+def main():
+    parser = setup_argparser()
     args = parser.parse_args()
 
     api_key = get_api_key(args)

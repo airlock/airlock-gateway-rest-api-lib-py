@@ -50,7 +50,8 @@ import os
 import re
 import sys
 
-from ..src import rest_api_lib as al
+from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
+from ..src.rest_api_lib import denyrules as dr
 from .utils import terminate_session_with_error, setup_session, confirm_prompt
 
 logging.basicConfig(
@@ -74,7 +75,7 @@ def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
         terminate_session_with_error(SESSION, "No mappings selected")
 
     selected_groups = []
-    for dr in al.get_deny_rule_groups(SESSION):
+    for dr in dr.get_deny_rule_groups(SESSION):
         if re.search(group_regex, dr["attributes"]["name"]):
             selected_groups.append(dr)
 
@@ -100,7 +101,7 @@ def add_exception(mapping_regex, group_regex, parameter_name_pattern, header_nam
 
     for mapping in selected_mappings:
         for group in selected_groups:
-            group_data = al.get_mapping_deny_rule_group(SESSION, mapping["id"], group["id"])
+            group_data = dr.get_mapping_deny_rule_group(SESSION, mapping["id"], group["id"])
             for exception in group_data["attributes"]["exceptions"]:
                 if "parameterNamePattern" in exception and exception["parameterNamePattern"]["name"] == identifier:
                     print(
@@ -135,9 +136,9 @@ def add_exception(mapping_regex, group_regex, parameter_name_pattern, header_nam
     }
     for mapping in selected_mappings:
         for group in selected_groups:
-            group_data = al.get_mapping_deny_rule_group(SESSION, mapping["id"], group["id"])
+            group_data = dr.get_mapping_deny_rule_group(SESSION, mapping["id"], group["id"])
             exceptions = group_data["attributes"]["exceptions"] + [exception]
-            al.update_mapping_deny_rule_group(SESSION, mapping["id"], group["id"], {"exceptions": exceptions})
+            dr.update_mapping_deny_rule_group(SESSION, mapping["id"], group["id"], {"exceptions": exceptions})
 
 
 def delete_exception(mapping_regex, group_regex, identifier, assumeyes):
@@ -150,7 +151,7 @@ def delete_exception(mapping_regex, group_regex, identifier, assumeyes):
     for mapping in selected_mappings:
         for group in selected_groups:
             group_ids = SESSION, mapping["id"], group["id"]
-            deny_rule_group_data = al.get_mapping_deny_rule_group(*group_ids)
+            deny_rule_group_data = dr.get_mapping_deny_rule_group(*group_ids)
 
             exceptions = deny_rule_group_data["attributes"]["exceptions"]
             pattern = "parameterNamePattern"
@@ -164,7 +165,7 @@ def delete_exception(mapping_regex, group_regex, identifier, assumeyes):
                     exceptions.remove(exception)
                     deleted_something = True
 
-            al.update_mapping_deny_rule_group(*group_ids, {"exceptions": exceptions})
+            dr.update_mapping_deny_rule_group(*group_ids, {"exceptions": exceptions})
 
     if deleted_something:
         return
@@ -178,7 +179,7 @@ def list_exceptions(mapping_regex, group_regex):
     """
     selected_mappings = al.select_mappings(SESSION, mapping_regex)
     selected_groups = []
-    for dr in al.get_deny_rule_groups(SESSION):
+    for dr in dr.get_deny_rule_groups(SESSION):
         if re.search(group_regex, dr["attributes"]["name"]):
             selected_groups.append(dr)
 
@@ -186,7 +187,7 @@ def list_exceptions(mapping_regex, group_regex):
     for mapping in selected_mappings:
         for group in selected_groups:
             group_ids = SESSION, mapping["id"], group["id"]
-            deny_rule_group_data = al.get_mapping_deny_rule_group(*group_ids)
+            deny_rule_group_data = dr.get_mapping_deny_rule_group(*group_ids)
             exceptions = deny_rule_group_data["attributes"]["exceptions"]
             for exception in exceptions:
                 name = None

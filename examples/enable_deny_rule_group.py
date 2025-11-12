@@ -14,15 +14,13 @@ By default, changes are saved (but not activated). To activate the configuration
 supply the --activate flag.
 """
 
-import sys
-import os
 import argparse
-import configparser
 import logging
 import json
 
-from ..src import rest_api_lib as al
-from .utils import terminate_session_with_error, setup_session
+from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
+from ..src.rest_api_lib import denyrules as dr
+from .utils import terminate_session_with_error, setup_session, get_api_key
 
 
 # Configure logging
@@ -35,20 +33,6 @@ module_logger = logging.getLogger(__name__)
 
 # Global session variable
 SESSION = None
-DEFAULT_API_KEY_FILE = "api_key.conf"
-
-def get_api_key(args, key_file=DEFAULT_API_KEY_FILE):
-    if args.api_key:
-        return args.api_key.strip()
-    elif os.path.exists(key_file):
-        config = configparser.ConfigParser()
-        config.read(key_file)
-        try:
-            return config.get("KEY", "api_key").strip()
-        except Exception as e:
-            sys.exit("Error reading API key from api_key.conf: " + str(e))
-    else:
-        sys.exit("API key needed, either via -k option or in an api_key.conf file.")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -93,12 +77,12 @@ def main():
     for mapping in mappings:
         mapping_id = mapping['id']
         # Retrieve the current deny rule group settings.
-        mapping_drg = al.get_mapping_deny_rule_group(SESSION, mapping_id, args.group_regex)
+        mapping_drg = dr.get_mapping_deny_rule_group(SESSION, mapping_id, args.group_regex)
         print(f"Mapping ID {mapping_id}: Current settings:")
         print(json.dumps(mapping_drg, indent=4))
         # Update the "enabled" attribute.
         mapping_drg['attributes']['enabled'] = enable_flag
-        success = al.update_mapping_deny_rule_group(
+        success = dr.update_mapping_deny_rule_group(
             SESSION,
             mapping_id,
             args.group_regex,

@@ -29,15 +29,13 @@ Usage examples:
   (Optionally add –y to skip confirmation and –c to provide a comment; –p to specify a port)
 """
 
-import sys
-import os
 import argparse
-import configparser
 import logging
 import re
 
-from ..src import rest_api_lib as al
-from .utils import terminate_session_with_error, setup_session
+from ..src.rest_api_lib import airlock_gateway_rest_requests_lib as al
+from ..src.rest_api_lib import denyrules as dr
+from .utils import terminate_session_with_error, setup_session, activate_or_save, confirm_prompt, get_api_key
 
 # Configure logging
 logging.basicConfig(
@@ -47,55 +45,58 @@ logging.basicConfig(
 )
 module_logger = logging.getLogger(__name__)
 
-SESSION = None
 
-def get_api_key(args, key_file="api_key.conf"):
-    if args.api_key:
-        return args.api_key.strip()
-    elif os.path.exists(key_file):
-        config = configparser.ConfigParser()
-        config.read(key_file)
-        try:
-            return config.get("KEY", "api_key").strip()
-        except Exception as e:
-            sys.exit(f"Error reading API key from {key_file}: {e}")
-    else:
-        sys.exit("API key needed, either via -k option or in an api_key.conf file.")
-
-def get_mappings_and_groups(mapping_regex, group_regex, assumeyes):
-    selected_mappings = al.select_mappings(SESSION, pattern=mapping_regex)
+def get_selected_mappings(session, mapping_regex):
+    selected_mappings = al.select_mappings(session, pattern=mapping_regex)
     if not selected_mappings:
-        terminate_session_with_error(SESSION, "No mappings selected")
+        terminate_session_with_error(session, "No mappings selected")
+    return selected_mappings
+
+
+def get_selected_groups(session, group_regex):
     selected_groups = []
-    for dr_group in al.get_deny_rule_groups(SESSION):
+    for dr_group in dr.get_deny_rule_groups(session):
         if re.search(group_regex, dr_group["attributes"]["name"]):
             selected_groups.append(dr_group)
-    if not selected_groups:
-        terminate_session_with_error(SESSION, "No deny-rule groups selected")
-    print("Selected mappings:")
-    for m in selected_mappings:
-        print("\t" + m["attributes"]["name"])
-    print("Selected deny-rule groups:")
-    for g in selected_groups:
-        print("\t" + g["attributes"]["name"])
-    if not assumeyes:
-        ans = input("Do you want to continue? [y/n] ")
-        if ans.lower() != "y":
-            terminate_session_with_error(SESSION, "Operation cancelled by user.")
-    return selected_mappings, selected_groups
+    return selected_groups
 
-def update_logonly_mode(mapping_regex, group_regex, log_only_value, assumeyes):
-    selected_mappings, selected_groups = get_mappings_and_groups(mapping_regex, group_regex, assumeyes)
+
+def get_selected_custom_groups(session, group_regex):
+    selected_groups = []
+    for dr_group in dr.get_custom_deny_rule_groups(session):
+        if re.search(group_regex, dr_group["attributes"]["name"]):
+            selected_groups.append(dr_group)
+    return selected_groups
+
+
+def update_logonly_mode(session, mapping_regex, group_regex, log_only, assumeyes):
+    selected_mappings = get_selected_mappings(session, mapping_regex)
+    selected_groups = get_selected_groups(session, group_regex)
+    selected_custom_groups = get_selected_custom_groups(session, group_regex)
+
+    if not assumeyes and confirm_prompt("Show selected mappings and deny-rule groups?"):
+        print("Selected mappings:")
+        for m in selected_mappings:
+            print("\t" + m["attributes"]["name"])
+        print("Selected built-in deny rule groups:")
+        for g in selected_groups:
+            print("\t" + g["attributes"]["name"])
+        print("Selected custom deny rule groups:")
+        for g in selected_custom_groups:
+            print("\t" + g["attributes"]["name"])
+
+    if not assumeyes and not confirm_prompt("Do you want to continue and update the log-only mode?"):
+        terminate_session_with_error(session, "Operation cancelled by user.")
+
     for mapping in selected_mappings:
         for group in selected_groups:
-            # Retrieve the current deny rule group usage data.
-            group_data = al.get_mapping_deny_rule_group(SESSION, mapping["id"], group["id"])
-            print(group_data, "\n")
-            # Patch the deny rule group: update logOnly attribute.
-            al.update_mapping_deny_rule_group(SESSION, mapping["id"], group["id"], {"logOnly": log_only_value})
-    return
+            # Patch the deny rule group: update logOnly attributes.
+            dr.set_builtin_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
+        for group in selected_custom_groups:
+            dr.set_custom_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
 
-def main():
+
+def setup_argparser():
     parser = argparse.ArgumentParser(
         description="Update log‑only mode for deny rule groups on selected mappings. "
                     "By default changes are saved; use --activate to activate the new configuration."
@@ -117,45 +118,46 @@ def main():
                         help="Gateway HTTPS port (default: 443)")
     parser.add_argument("-c", "--comment", default="Set log-only mode via REST API",
                         help="Comment for the configuration change")
+    parser.add_argument("-l", "--log-level", help="Set the logging level (debug, info, warning, error, critical). Default: info", default="info")
+
+    return parser
+
+
+def main():
+    parser = setup_argparser()
     args = parser.parse_args()
 
-    global SESSION
+    if args.log_level:
+        numeric_level = getattr(logging, args.log_level.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: %s' % args.log_level)
+        logging.getLogger().setLevel(numeric_level)
+        module_logger.setLevel(numeric_level)
+
     api_key = get_api_key(args)
-    SESSION = setup_session(args.gateway, api_key, args.port)
+    module_logger.debug("Successfully retrieved API key.")
+
+    gw_session = setup_session(args.gateway, api_key, args.port)
 
     # Determine desired logOnly mode
-    log_only_value = False if args.disable else True
+    log_only = not args.disable
+    if log_only:
+        module_logger.info("Set log-only mode to 'ON'")
+    else:
+        module_logger.warning("Set log-only mode to 'OFF'")
 
     # Update log-only mode for each mapping and each deny rule group selected
-    update_logonly_mode(args.mapping_regex, args.group_regex, log_only_value, args.assumeyes)
+    update_logonly_mode(gw_session, args.mapping_regex, args.group_regex, log_only, args.assumeyes)
 
     # Prepare change summary
-    affected_names = [m["attributes"]["name"] for m in al.select_mappings(SESSION, pattern=args.mapping_regex)]
+    affected_names = [m["attributes"]["name"] for m in al.select_mappings(gw_session, pattern=args.mapping_regex)]
     change_info = f"Log‑only mode {'disabled' if args.disable else 'enabled'} for deny rule groups on mappings: " + ", ".join(affected_names)
     print("\n" + change_info)
 
     # Confirm change (unless assumeyes is given) and then save/activate config
-    if not args.assumeyes:
-        prompt_text = "\nContinue to "
-        if args.activate:
-            prompt_text += "save and activate "
-        else:
-            prompt_text += "save "
-        prompt_text += "the new configuration? [y/n] "
-        ans = input(prompt_text)
-        if ans.lower() != "y":
-            terminate_session_with_error(SESSION, "Operation cancelled.")
-    if args.activate:
-        if al.activate(SESSION, args.comment):
-            print("Configuration activated successfully.")
-        else:
-            al.save_config(SESSION, args.comment)
-            print("Activation failed; configuration saved instead.")
-    else:
-        al.save_config(SESSION, args.comment)
-        print("Configuration saved.")
+    activate_or_save(gw_session, args.comment, args.assumeyes, args.activate)
 
-    al.terminate_session(SESSION)
+    al.terminate_session(gw_session)
 
 if __name__ == "__main__":
     main()
