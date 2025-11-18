@@ -91,9 +91,9 @@ def update_logonly_mode(session, mapping_regex, group_regex, log_only, assumeyes
     for mapping in selected_mappings:
         for group in selected_groups:
             # Patch the deny rule group: update logOnly attributes.
-            dr.set_builtin_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
+            dr.toggle_builtin_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
         for group in selected_custom_groups:
-            dr.set_custom_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
+            dr.toggle_custom_deny_rule_group_logonly(session, mapping["id"], group["id"], log_only)
 
 
 def setup_argparser():
