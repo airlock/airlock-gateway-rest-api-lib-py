@@ -214,7 +214,7 @@ def get_custom_deny_rule(gw_session: al.GatewaySession, custom_denyrule_id: str)
 
 # Functions to switch logOnly mode on or off
 # for both built-in and custom deny rules and deny rule groups
-def set_built_in_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
+def toggle_built_in_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
                                    denyrule_shortname: str, log_only: bool) -> bool:
     '''
     Sets the logOnly attribute for a built-in deny rule on a specified mapping.
@@ -223,7 +223,7 @@ def set_built_in_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: st
     return update_mapping_deny_rule(gw_session, mapping_id, denyrule_shortname, {"logOnly": log_only})
 
 
-def set_custom_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
+def toggle_custom_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
                                  custom_denyrule_id: str, log_only: bool) -> bool:
     '''
     Sets the logOnly attribute for a custom deny rule on a specified mapping.
@@ -232,7 +232,7 @@ def set_custom_deny_rule_logonly(gw_session: al.GatewaySession, mapping_id: str,
     return update_mapping_custom_deny_rule(gw_session, mapping_id, custom_denyrule_id, {"logOnly": log_only})
 
 
-def set_builtin_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
+def toggle_builtin_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
                                        group_shortname: str, log_only: bool) -> bool:
     '''
     Sets the logOnly attribute for a built-in deny rule group on a specified mapping and all its rules.
@@ -251,11 +251,11 @@ def set_builtin_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_i
 
     # Also update all rules in group
     for shortName in all_shortNames_in_group:
-        res = set_built_in_deny_rule_logonly(gw_session, mapping_id, shortName, log_only) and res
+        res = toggle_built_in_deny_rule_logonly(gw_session, mapping_id, shortName, log_only) and res
     return res
 
 
-def set_custom_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
+def toggle_custom_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id: str,
                                       custom_denyrule_group_id: str, log_only: bool) -> bool:
     '''
     Sets the logOnly attribute for a custom deny rule group on a specified mapping.
@@ -274,5 +274,5 @@ def set_custom_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping_id
 
     # Also update all rules in group
     for rule_id in all_rule_ids_in_group:
-        res = set_custom_deny_rule_logonly(gw_session, mapping_id, rule_id, log_only) and res
+        res = toggle_custom_deny_rule_logonly(gw_session, mapping_id, rule_id, log_only) and res
     return res
