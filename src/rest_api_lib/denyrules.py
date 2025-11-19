@@ -172,6 +172,7 @@ def update_mapping_custom_deny_rule(gw_session: al.GatewaySession, mapping_id: s
     res = al.patch(gw_session, path, data, exp_code=[200, 404])
     return res.status_code == 200
 
+
 def get_custom_deny_rule_groups(gw_session: al.GatewaySession) -> list:
     '''
     Returns a list of all custom deny rule groups on the Airlock Host.
@@ -180,6 +181,25 @@ def get_custom_deny_rule_groups(gw_session: al.GatewaySession) -> list:
     path = '/configuration/custom-deny-rule-groups'
     res = al.get(gw_session, path, exp_code=200)
     return res.json().get("data")
+
+
+def create_custom_deny_rule_group(gw_session: al.GatewaySession, group_name: str) -> dict:
+    """
+    Create a new custom deny rule group on the target gateway with the specified name.
+    Returns a dictionary object describing the new custom deny rule group, or None on failure.
+    """
+    path = "/configuration/custom-deny-rule-groups"
+    data =  {
+        "data": {
+            "type": "custom-deny-rule-group",
+            "attributes": {
+                "name": group_name
+            }
+        }
+    }
+    res = al.post(gw_session, path, data, exp_code=201)
+    return res.json().get("data")
+
 
 def get_custom_deny_rule_group(gw_session: al.GatewaySession, custom_denyrule_group_id: str) -> dict:
     '''
@@ -202,6 +222,25 @@ def get_custom_deny_rules(gw_session: al.GatewaySession) -> list:
     return res.json().get("data")
 
 
+def create_custom_deny_rule(gw_session: al.GatewaySession, rule_name: str, restrictions: dict) -> dict:
+    """
+    Create a new custom deny rule on the target gateway with the specified name and restrictions.
+    Returns a dictionary object describing the new custom deny rule, or None on failure.
+    """
+    path = "/configuration/custom-deny-rules"
+    data =  {
+        "data": {
+            "type": "custom-deny-rule",
+            "attributes": {
+                "name": rule_name,
+                "restrictions": restrictions
+            }
+        }
+    }
+    res = al.post(gw_session, path, data, exp_code=201)
+    return res.json().get("data")
+
+
 def get_custom_deny_rule(gw_session: al.GatewaySession, custom_denyrule_id: str) -> dict:
     '''
     Returns a dictionary object describing the specified custom deny-rule, or None
@@ -210,6 +249,24 @@ def get_custom_deny_rule(gw_session: al.GatewaySession, custom_denyrule_id: str)
     path = f'/configuration/custom-deny-rules/{custom_denyrule_id}'
     res = al.get(gw_session, path, exp_code=[200, 404])
     return res.json().get("data")
+
+
+def add_custom_deny_rule_connections(gw_session: al.GatewaySession, group_id: str, rule_ids: list[str]):
+    """
+    Connect multiple existing custom deny rules to an existing custom deny rule group.
+    Returns True on success, False on failure.
+    """
+    path = f"/configuration/custom-deny-rule-groups/{group_id}/relationships/custom-deny-rules"
+    data = {
+        "data": [
+            {
+                "type": "custom-deny-rule",
+                "id": rule_id
+            } for rule_id in rule_ids
+        ]
+    }
+    res = al.post(gw_session, path, data, exp_code=[204, 404])
+    return res.status_code == 204
 
 
 # Functions to switch logOnly mode on or off
