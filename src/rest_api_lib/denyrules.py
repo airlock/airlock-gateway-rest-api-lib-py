@@ -164,7 +164,7 @@ def update_mapping_custom_deny_rule(gw_session: al.GatewaySession, mapping_id: s
     path = f'/configuration/mappings/{mapping_id}/custom-deny-rules/{custom_denyrule_id}'
     data = {
         "data": {
-            "type": "mapping-deny-rule",
+            "type": "mapping-custom-deny-rule",
             "id": custom_denyrule_id,
             "attributes": attributes
         }
