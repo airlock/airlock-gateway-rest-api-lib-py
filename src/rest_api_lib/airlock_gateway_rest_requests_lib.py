@@ -146,7 +146,7 @@ def req(gw_session: GatewaySession, method: str,
         module_logger.debug("Response payload:")
         try:
             module_logger.debug("\n%s", json.dumps(res.json(), indent=4))
-        except json.JSONDecodeError:
+        except requests.exceptions.JSONDecodeError:
             module_logger.debug(res.text)
     _res_expect_handle(res, exp_code)
     return res
