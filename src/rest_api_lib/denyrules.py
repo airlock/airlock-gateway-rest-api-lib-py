@@ -265,7 +265,7 @@ def add_custom_deny_rule_connections(gw_session: al.GatewaySession, group_id: st
             } for rule_id in rule_ids
         ]
     }
-    res = al.post(gw_session, path, data, exp_code=[204, 404])
+    res = al.patch(gw_session, path, data, exp_code=[204, 404])
     return res.status_code == 204
 
 
@@ -325,9 +325,8 @@ def toggle_custom_deny_rule_group_logonly(gw_session: al.GatewaySession, mapping
     # Get all rules in group
     group_obj = get_custom_deny_rule_group(gw_session, custom_denyrule_group_id)
     all_rule_ids_in_group = set()
-    for rules in group_obj["relationships"]["custom-deny-rules"]["data"]:
-        for rule_id in rules["id"]:
-            all_rule_ids_in_group.add(rule_id)
+    for rule in group_obj["relationships"]["custom-deny-rules"]["data"]:
+        all_rule_ids_in_group.add(rule["id"])
 
     # Also update all rules in group
     for rule_id in all_rule_ids_in_group:
